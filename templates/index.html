@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Domov - Trhovisko{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-md-8">
+            <h1 class="mb-4">Vitajte na Trhovisku</h1>
+            <p class="lead">Moderný inzerčný portál pre jednoduché a rýchle obchodovanie.</p>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Rýchle vyhľadávanie</h5>
+                    <form>
+                        <div class="mb-3">
+                            <input type="text" class="form-control" placeholder="Čo hľadáte?">
+                        </div>
+                        <div class="mb-3">
+                            <select class="form-select">
+                                <option selected>Všetky kategórie</option>
+                                <option>Elektronika</option>
+                                <option>Oblečenie</option>
+                                <option>Nábytok</option>
+                                <option>Autá</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">Hľadať</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr class="my-5">
+
+    <h2 class="mb-4">Najnovšie inzeráty</h2>
+    <div class="row" id="listings-container">
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100">
+                <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="Inzerát">
+                <div class="card-body">
+                    <h5 class="card-title">iPhone 13 Pro Max</h5>
+                    <p class="card-text">Výborný stav, 256GB, záruka do 12/2024.</p>
+                    <p class="fw-bold text-primary">850 €</p>
+                    <p class="text-muted"><small>Bratislava • Dnes</small></p>
+                </div>
+                <div class="card-footer">
+                    <a href="#" class="btn btn-outline-primary btn-sm">Detail</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100">
+                <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="Inzerát">
+                <div class="card-body">
+                    <h5 class="card-title">Knižnica drevená</h5>
+                    <p class="card-text">Pevná, tmavá drevená knižnica, rozmer 180x80x40 cm.</p>
+                    <p class="fw-bold text-primary">120 €</p>
+                    <p class="text-muted"><small>Košice • Včera</small></p>
+                </div>
+                <div class="card-footer">
+                    <a href="#" class="btn btn-outline-primary btn-sm">Detail</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card h-100">
+                <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="Inzerát">
+                <div class="card-body">
+                    <h5 class="card-title">Bicykel MTB</h5>
+                    <p class="card-text">Horský bicykel 27", 21 rýchlostí, nový.</p>
+                    <p class="fw-bold text-primary">350 €</p>
+                    <p class="text-muted"><small>Žilina • Pred 2 dňami</small></p>
+                </div>
+                <div class="card-footer">
+                    <a href="#" class="btn btn-outline-primary btn-sm">Detail</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="#" class="btn btn-primary">Zobraziť všetky inzeráty</a>
+    </div>
+{% endblock %}
