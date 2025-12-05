@@ -205,9 +205,7 @@ def logout():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # Pre tento príklad predpokladáme, že máte vytvorený aj dashboard.html
-    return f'Ahoj, {current_user.username}! Si prihlásený a vidíš svoj dashboard.'
-
+    return render_template('dashboard.html')
 # --- 5. APPLICATION RUNNER ---
 def create_db():
     """Volá db.create_all() v aplikačnom kontexte."""

@@ -1,0 +1,83 @@
+
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Môj profil</h5>
+                <p class="card-text">
+                    <strong>Meno:</strong> {{ current_user.username }}<br>
+                    <strong>Email:</strong> {{ current_user.email }}<br>
+                    <strong>Členom od:</strong> {{ current_user.created_at.strftime('%d.%m.%Y') }}
+                </p>
+            </div>
+        </div>
+
+        <div class="list-group mt-3">
+            <a href="#profile" class="list-group-item list-group-item-action active" data-bs-toggle="tab">
+                Profil
+            </a>
+            <a href="#listings" class="list-group-item list-group-item-action" data-bs-toggle="tab">
+                Moje inzeráty
+            </a>
+            <a href="#change-password" class="list-group-item list-group-item-action" data-bs-toggle="tab">
+                Zmena hesla
+            </a>
+        </div>
+    </div>
+
+    <!-- Main content -->
+    <div class="col-md-9">
+        <div class="tab-content">
+            <!-- Profile tab -->
+            <div class="tab-pane fade show active" id="profile">
+                <h3>Môj profil</h3>
+                <p>Tu môžete spravovať svoje údaje.</p>
+            </div>
+
+            <!-- Listings tab -->
+            <div class="tab-pane fade" id="listings">
+                <h3>Moje inzeráty</h3>
+                <div class="row" id="user-listings">
+                    <!-- Inzeráty sa načítajú cez AJAX -->
+                </div>
+            </div>
+
+            <!-- Change password tab -->
+            <div class="tab-pane fade" id="change-password">
+                <h3>Zmena hesla</h3>
+                <form id="changePasswordForm" class="mt-4">
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Súčasné heslo</label>
+                        <input type="password" class="form-control" id="current_password" required>
+                        <div class="invalid-feedback" id="current_password_error"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">Nové heslo</label>
+                        <input type="password" class="form-control" id="new_password" required minlength="6">
+                        <div class="invalid-feedback" id="new_password_error"></div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Potvrdenie nového hesla</label>
+                        <input type="password" class="form-control" id="confirm_password" required>
+                        <div class="invalid-feedback" id="confirm_password_error"></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Zmeniť heslo</button>
+                    <div id="password-change-result" class="mt-2"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
+{% endblock %}
