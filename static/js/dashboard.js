@@ -2,52 +2,112 @@
 // --- 1. CORE FUNCTIONS (Load Listings, Delete Listing) ---
 
 function loadUserListings() {
+    const loadingElement = document.getElementById('listings-loading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
+
     fetch('/api/my-listings')
         .then(response => response.json())
         .then(listings => {
             const container = document.getElementById('user-listings');
             let htmlContent = '';
 
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+
             if (listings.length === 0) {
                 htmlContent = `
                     <div class="col-12">
-                        <div class="alert alert-info">
-                            Zatiaľ nemáte žiadne inzeráty.
-                            <a href="/listings/new" class="alert-link">Pridať prvý inzerát</a>
+                        <div class="alert alert-info text-center">
+                            <i class="bi bi-info-circle display-4 mb-3"></i>
+                            <h4 class="alert-heading">Zatiaľ nemáte žiadne inzeráty</h4>
+                            <p>Začnite predávať na Trhovisku!</p>
+                            <a href="/listings/new" class="btn btn-success mt-2">
+                                <i class="bi bi-plus-circle"></i> Pridať prvý inzerát
+                            </a>
                         </div>
                     </div>
                 `;
             } else {
                 listings.forEach(listing => {
-                    // Použite placeholder, keďže nemáme skutočné obrázky
-                    const imageUrl = 'https://via.placeholder.com/300x200/6c757d/ffffff?text=' + encodeURIComponent(listing.title.substring(0, 15));
+                    // Použite skutočný obrázok alebo placeholder
+                    let imageUrl = listing.image_url;
+                    if (!imageUrl) {
+                        // Použite placeholder s textom z titulu
+                        const placeholderText = encodeURIComponent(listing.title.substring(0, 15));
+                        imageUrl = `https://via.placeholder.com/300x200/6c757d/ffffff?text=${placeholderText}`;
+                    }
+
                     const priceFormatted = listing.price ? `${listing.price} €` : 'Dohodou';
                     const createdAt = listing.created_at || 'Nedátované';
 
                     // Bezpečne získať popis (ak existuje)
                     const description = listing.description || 'Bez popisu';
-                    const shortDescription = description.length > 70 ? description.substring(0, 70) + '...' : description;
+                    const shortDescription = description.length > 100 ? description.substring(0, 100) + '...' : description;
+
+                    // Určiť farbu badge podľa statusu
+                    let statusBadgeClass = 'bg-secondary';
+                    let statusText = 'Neznámy';
+
+                    switch(listing.status) {
+                        case 'active':
+                            statusBadgeClass = 'bg-success';
+                            statusText = 'Aktívny';
+                            break;
+                        case 'sold':
+                            statusBadgeClass = 'bg-danger';
+                            statusText = 'Predaný';
+                            break;
+                        case 'expired':
+                            statusBadgeClass = 'bg-warning';
+                            statusText = 'Expirovaný';
+                            break;
+                    }
 
                     htmlContent += `
                         <div class="col-lg-4 col-md-6 mb-4">
                             <div class="card h-100">
-                                <img src="${imageUrl}" class="card-img-top" alt="${listing.title}" style="height: 200px; object-fit: cover;">
+                                <div class="position-relative">
+                                    <img src="${imageUrl}" 
+                                         class="card-img-top img-thumbnail" 
+                                         alt="${listing.title}" 
+                                         style="height: 200px; object-fit: cover;">
+                                    <span class="position-absolute top-0 start-0 m-2 badge ${statusBadgeClass}">
+                                        ${statusText}
+                                    </span>
+                                </div>
                                 <div class="card-body">
                                     <h5 class="card-title">${listing.title}</h5>
-                                    <p class="card-text">${shortDescription}</p>
-                                    <p class="fw-bold text-primary">${priceFormatted}</p>
-                                    <p class="text-muted">
-                                        <small>
-                                            ${listing.location || 'Neuvedené'} • 
-                                            ${listing.category_name || 'Bez kategórie'} • 
-                                            ${createdAt}
-                                        </small>
+                                    <p class="card-text text-muted small">
+                                        <i class="bi bi-geo-alt"></i> ${listing.location || 'Neuvedené'}
                                     </p>
-                                    <p><span class="badge bg-${listing.status === 'active' ? 'success' : 'secondary'}">${listing.status}</span></p>
+                                    <p class="card-text">${shortDescription}</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="h5 text-primary mb-0">${priceFormatted}</span>
+                                        <small class="text-muted">
+                                            <i class="bi bi-calendar"></i> ${createdAt}
+                                        </small>
+                                    </div>
+                                    <p class="mt-2 mb-1">
+                                        <span class="badge bg-info">
+                                            <i class="bi bi-tag"></i> ${listing.category_name || 'Bez kategórie'}
+                                        </span>
+                                    </p>
                                 </div>
-                                <div class="card-footer d-flex justify-content-between">
-                                    <a href="/listings/${listing.id}/edit" class="btn btn-warning btn-sm">Upraviť</a>
-                                    <button onclick="deleteListing(${listing.id})" class="btn btn-danger btn-sm">Odstrániť</button>
+                                <div class="card-footer bg-transparent d-flex justify-content-between">
+                                    <a href="/listings/${listing.id}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Zobraziť
+                                    </a>
+                                    <div>
+                                        <a href="/listings/${listing.id}/edit" class="btn btn-sm btn-warning me-1">
+                                            <i class="bi bi-pencil"></i> Upraviť
+                                        </a>
+                                        <button onclick="deleteListing(${listing.id})" class="btn btn-sm btn-danger">
+                                            <i class="bi bi-trash"></i> Odstrániť
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -56,14 +116,30 @@ function loadUserListings() {
             }
 
             if (container) {
-                container.innerHTML = `<div class="row">${htmlContent}</div>`;
+                container.innerHTML = htmlContent;
             }
         })
         .catch(error => {
             console.error('Chyba pri načítaní inzerátov:', error);
             const container = document.getElementById('user-listings');
             if (container) {
-                 container.innerHTML = '<div class="col-12"><div class="alert alert-danger">Chyba pri načítaní inzerátov. Skúste znova neskôr.</div></div>';
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger text-center">
+                            <i class="bi bi-exclamation-triangle display-4 mb-3"></i>
+                            <h4 class="alert-heading">Chyba pri načítaní inzerátov</h4>
+                            <p>Skúste znova neskôr alebo obnovte stránku.</p>
+                            <button onclick="loadUserListings()" class="btn btn-outline-danger mt-2">
+                                <i class="bi bi-arrow-clockwise"></i> Skúsiť znova
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const loadingElement = document.getElementById('listings-loading');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
             }
         });
 }

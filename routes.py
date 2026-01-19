@@ -1,11 +1,17 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
 from extensions import db
-from models import User, Category, Listing
+from sqlalchemy import or_
+from models import User, Category, Listing, Image, Message, Favorite
 from forms import RegistrationForm, LoginForm, ListingForm, ChangePasswordForm
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime
-
+import os
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif'}
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def register_routes(app):
     """Registruje všetky route handlers do aplikácie"""
@@ -133,7 +139,32 @@ def register_routes(app):
             )
 
             db.session.add(listing)
-            db.session.commit()
+            db.session.commit()  # Potrebujeme ID pre obrázky
+
+            # Spracovanie nahraných obrázkov
+            if form.images.data:
+                for file in form.images.data:
+                    if file and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        # Vytvorte jedinečný názov súboru
+                        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+                        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+
+                        # Uistite sa, že priečinok existuje
+                        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+                        # Uložte súbor
+                        file.save(file_path)
+
+                        # Vytvorte záznam v databáze
+                        image = Image(
+                            filename=unique_filename,
+                            listing_id=listing.id,
+                            is_primary=False  # Prvý obrázok môžete nastaviť ako primárny
+                        )
+                        db.session.add(image)
+
+                db.session.commit()
 
             flash('Inzerát bol úspešne pridaný!', 'success')
             return redirect(url_for('dashboard'))
@@ -173,6 +204,11 @@ def register_routes(app):
 
         listings_data = []
         for listing in listings:
+            # Získať URL prvého obrázka, ak existuje
+            image_url = None
+            if listing.images and len(listing.images) > 0:
+                image_url = url_for('static', filename='uploads/' + listing.images[0].filename)
+
             listings_data.append({
                 'id': listing.id,
                 'title': listing.title,
@@ -181,7 +217,9 @@ def register_routes(app):
                 'location': listing.location,
                 'status': listing.status,
                 'created_at': listing.created_at.strftime('%d.%m.%Y') if listing.created_at else 'N/A',
-                'category_name': listing.category.name if listing.category else 'Bez kategórie'
+                'category_name': listing.category.name if listing.category else 'Bez kategórie',
+                'image_url': image_url,  # Pridané URL obrázka
+                'has_images': len(listing.images) > 0  # Pridané informácie o existencii obrázkov
             })
 
         return jsonify(listings_data)
@@ -202,6 +240,7 @@ def register_routes(app):
         return render_template('listing_detail.html',
                                listing=listing,
                                similar_listings=similar_listings)
+
     @app.route('/listings/<int:id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_listing(id):
@@ -211,8 +250,16 @@ def register_routes(app):
             flash('Nemáte oprávnenie upravovať tento inzerát.', 'danger')
             return redirect(url_for('dashboard'))
 
-        form = ListingForm(obj=listing)
+        form = ListingForm()
         form.category_id.choices = [(c.id, c.name) for c in Category.query.all()]
+
+        # Naplnenie formulára s existujúcimi dátami (okrem obrázkov)
+        if request.method == 'GET':
+            form.title.data = listing.title
+            form.description.data = listing.description
+            form.price.data = listing.price
+            form.location.data = listing.location
+            form.category_id.data = listing.category_id
 
         if form.validate_on_submit():
             listing.title = form.title.data
@@ -221,29 +268,117 @@ def register_routes(app):
             listing.location = form.location.data
             listing.category_id = form.category_id.data
 
+            # Spracovanie nových nahraných obrázkov
+            if form.images.data:
+                for file in form.images.data:
+                    # Skontrolovať, či ide o skutočný súbor
+                    if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+                        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+
+                        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                        file.save(file_path)
+
+                        image = Image(
+                            filename=unique_filename,
+                            listing_id=listing.id,
+                            is_primary=False
+                        )
+                        db.session.add(image)
+                    # Debug: vypísať informácie o súbore
+                    else:
+                        print(f"Súbor nie je validný: {file}")
+
             db.session.commit()
             flash('Inzerát bol úspešne upravený!', 'success')
             return redirect(url_for('dashboard'))
 
         return render_template('edit_listing.html', form=form, listing=listing)
-
     @app.route('/listings')
     def listings():
-        # Získanie všetkých aktívnych inzerátov
-        all_listings = Listing.query.filter_by(status='active').order_by(Listing.created_at.desc()).all()
+        # Získanie parametrov z requestu
+        search_query = request.args.get('q', '').strip()
+        category_id = request.args.get('category', type=int)
+        min_price = request.args.get('min_price', type=float)
+        max_price = request.args.get('max_price', type=float)
+        location_query = request.args.get('location', '').strip()
 
-        # Pagination (voliteľné)
+        # Začneme s dotazom pre aktívne inzeráty
+        query = Listing.query.filter_by(status='active')
+
+        # Vyhľadávanie (full-text) - hľadá v titulku a popise
+        if search_query:
+            like_pattern = f'%{search_query}%'
+            query = query.filter(
+                or_(
+                    Listing.title.ilike(like_pattern),
+                    Listing.description.ilike(like_pattern)
+                )
+            )
+
+        # Filtrovanie podľa kategórie
+        if category_id:
+            query = query.filter_by(category_id=category_id)
+
+        # Filtrovanie podľa ceny
+        if min_price is not None:
+            query = query.filter(Listing.price >= min_price)
+        if max_price is not None:
+            query = query.filter(Listing.price <= max_price)
+
+        # Filtrovanie podľa lokality
+        if location_query:
+            query = query.filter(Listing.location.ilike(f'%{location_query}%'))
+
+        # Zoradenie podľa dátumu vytvorenia (od najnovšieho)
+        query = query.order_by(Listing.created_at.desc())
+
+        # Pagination
         page = request.args.get('page', 1, type=int)
-        per_page = 12  # Počet inzerátov na stránku
+        per_page = 12
+        paginated_listings = query.paginate(page=page, per_page=per_page, error_out=False)
 
-        paginated_listings = Listing.query.filter_by(status='active') \
-            .order_by(Listing.created_at.desc()) \
-            .paginate(page=page, per_page=per_page, error_out=False)
+        # Získať kategórie pre sidebar
+        categories = Category.query.all()
 
         return render_template('listings.html',
                                listings=paginated_listings.items,
-                               pagination=paginated_listings)
+                               pagination=paginated_listings,
+                               categories=categories,
+                               selected_category=category_id,
+                               total_listings=query.count())
 
+    # Pridajte túto funkciu do routes.py
+    @app.route('/listings/<int:listing_id>/images/<int:image_id>/delete', methods=['DELETE'])
+    @login_required
+    def delete_image(listing_id, image_id):
+        listing = Listing.query.get_or_404(listing_id)
+        image = Image.query.get_or_404(image_id)
+
+        # Kontrola, či používateľ vlastní inzerát
+        if listing.user_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
+
+        # Kontrola, či obrázok patrí k inzerátu
+        if image.listing_id != listing_id:
+            return jsonify({'success': False, 'message': 'Obrázok nepatrí k tomuto inzerátu'}), 400
+
+        try:
+            # Odstrániť súbor z disku
+            file_path = os.path.join(UPLOAD_FOLDER, image.filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+            # Odstrániť záznam z databázy
+            db.session.delete(image)
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Obrázok bol odstránený'}), 200
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri mazaní obrázka: {e}")
+            return jsonify({'success': False, 'message': 'Chyba pri odstraňovaní obrázka'}), 500
 
     # Route pre odoslanie správy
     @app.route('/send-message', methods=['POST'])

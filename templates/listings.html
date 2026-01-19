@@ -7,49 +7,56 @@
     <div class="col-lg-3">
         <!-- Sidebar s filtrami -->
         <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Filtre</h5>
+    <div class="card-header">
+        <h5 class="mb-0">Filtre</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('listings') }}">
+            <!-- Nové pole pre vyhľadávanie podľa reťazca -->
+            <div class="mb-3">
+                <label for="search" class="form-label">Vyhľadávanie</label>
+                <input type="text" class="form-control" id="search" name="q"
+                       value="{{ request.args.get('q', '') }}" placeholder="Hľadať v názve a popise...">
             </div>
-            <div class="card-body">
-                <form method="GET" action="{{ url_for('listings') }}">
-                    <div class="mb-3">
-                        <label for="category" class="form-label">Kategória</label>
-                        <select class="form-select" id="category" name="category">
-                            <option value="">Všetky kategórie</option>
-                            {% for category in categories %}
-                            <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>
-                                {{ category.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
 
-                    <div class="row mb-3">
-                        <div class="col">
-                            <label for="min_price" class="form-label">Min cena (€)</label>
-                            <input type="number" class="form-control" id="min_price" name="min_price"
-                                   value="{{ request.args.get('min_price', '') }}" placeholder="0">
-                        </div>
-                        <div class="col">
-                            <label for="max_price" class="form-label">Max cena (€)</label>
-                            <input type="number" class="form-control" id="max_price" name="max_price"
-                                   value="{{ request.args.get('max_price', '') }}" placeholder="9999">
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="location" class="form-label">Lokalita</label>
-                        <input type="text" class="form-control" id="location" name="location"
-                               value="{{ request.args.get('location', '') }}" placeholder="Zadajte lokalitu">
-                    </div>
-
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Filtrovať</button>
-                        <a href="{{ url_for('listings') }}" class="btn btn-outline-secondary mt-2">Zrušiť filtre</a>
-                    </div>
-                </form>
+            <div class="mb-3">
+                <label for="category" class="form-label">Kategória</label>
+                <select class="form-select" id="category" name="category">
+                    <option value="">Všetky kategórie</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                    {% endfor %}
+                </select>
             </div>
-        </div>
+
+            <div class="row mb-3">
+                <div class="col">
+                    <label for="min_price" class="form-label">Min cena (€)</label>
+                    <input type="number" class="form-control" id="min_price" name="min_price"
+                           value="{{ request.args.get('min_price', '') }}" placeholder="0">
+                </div>
+                <div class="col">
+                    <label for="max_price" class="form-label">Max cena (€)</label>
+                    <input type="number" class="form-control" id="max_price" name="max_price"
+                           value="{{ request.args.get('max_price', '') }}" placeholder="9999">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="location" class="form-label">Lokalita</label>
+                <input type="text" class="form-control" id="location" name="location"
+                       value="{{ request.args.get('location', '') }}" placeholder="Zadajte lokalitu">
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Filtrovať</button>
+                <a href="{{ url_for('listings') }}" class="btn btn-outline-secondary mt-2">Zrušiť filtre</a>
+            </div>
+        </form>
+    </div>
+</div>
     </div>
 
     <div class="col-lg-9">

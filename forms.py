@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed
+from flask_wtf.file import FileField, FileAllowed, MultipleFileField
 from wtforms import StringField, PasswordField, SubmitField, TextAreaField, FloatField, SelectField
 from wtforms.validators import DataRequired, Length, EqualTo, Email, ValidationError
 from extensions import db
@@ -21,7 +21,9 @@ class ListingForm(FlaskForm):
     price = FloatField('Cena (€)', validators=[DataRequired()])
     location = StringField('Lokalita', validators=[DataRequired()])
     category_id = SelectField('Kategória', coerce=int, validators=[DataRequired()])
-    images = FileField('Obrázky', validators=[FileAllowed(['jpg', 'jpeg', 'png', 'gif'])])
+    images = MultipleFileField('Obrázky', validators=[
+        FileAllowed(['jpg', 'jpeg', 'png', 'gif'], 'Len obrázky sú povolené (jpg, jpeg, png, gif)!')
+    ])
     submit = SubmitField('Uložiť inzerát')
 
 

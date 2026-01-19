@@ -1,4 +1,3 @@
-
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 
@@ -19,13 +18,13 @@
 
         <div class="list-group mt-3">
             <a href="#profile" class="list-group-item list-group-item-action active" data-bs-toggle="tab">
-                Profil
+                <i class="bi bi-person me-2"></i>Profil
             </a>
             <a href="#listings" class="list-group-item list-group-item-action" data-bs-toggle="tab">
-                Moje inzeráty
+                <i class="bi bi-list-ul me-2"></i>Moje inzeráty
             </a>
             <a href="#change-password" class="list-group-item list-group-item-action" data-bs-toggle="tab">
-                Zmena hesla
+                <i class="bi bi-key me-2"></i>Zmena hesla
             </a>
         </div>
     </div>
@@ -35,13 +34,54 @@
         <div class="tab-content">
             <!-- Profile tab -->
             <div class="tab-pane fade show active" id="profile">
-                <h3>Môj profil</h3>
+                <h3><i class="bi bi-person me-2"></i>Môj profil</h3>
                 <p>Tu môžete spravovať svoje údaje.</p>
+
+                <!-- Jednoduché štatistiky -->
+                <div class="row mt-4">
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ current_user.listings|length }}</h5>
+                                <p class="card-text">Inzerátov</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ current_user.listings|selectattr('status', 'equalto', 'active')|list|length }}</h5>
+                                <p class="card-text">Aktívnych</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="card text-center">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ current_user.listings|selectattr('status', 'equalto', 'sold')|list|length }}</h5>
+                                <p class="card-text">Predaných</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Listings tab -->
             <div class="tab-pane fade" id="listings">
-                <h3>Moje inzeráty</h3>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3><i class="bi bi-list-ul me-2"></i>Moje inzeráty</h3>
+                    <a href="{{ url_for('new_listing') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle me-1"></i>Nový inzerát
+                    </a>
+                </div>
+
+                <div id="listings-loading" class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Načítavam...</span>
+                    </div>
+                    <p class="mt-2">Načítavam vaše inzeráty...</p>
+                </div>
+
                 <div class="row" id="user-listings">
                     <!-- Inzeráty sa načítajú cez AJAX -->
                 </div>
@@ -49,7 +89,7 @@
 
             <!-- Change password tab -->
             <div class="tab-pane fade" id="change-password">
-                <h3>Zmena hesla</h3>
+                <h3><i class="bi bi-key me-2"></i>Zmena hesla</h3>
                 <form id="changePasswordForm" class="mt-4">
                     <div class="mb-3">
                         <label for="current_password" class="form-label">Súčasné heslo</label>
@@ -69,15 +109,52 @@
                         <div class="invalid-feedback" id="confirm_password_error"></div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Zmeniť heslo</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle me-1"></i>Zmeniť heslo
+                    </button>
                     <div id="password-change-result" class="mt-2"></div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-{% endblock %}
+
+<style>
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #dee2e6;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.list-group-item.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.35em 0.65em;
+}
+
+.img-thumbnail {
+    object-fit: cover;
+    height: 200px;
+    width: 100%;
+}
+
+.status-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 1;
+}
+</style>
 {% endblock %}
