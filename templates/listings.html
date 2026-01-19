@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Všetky inzeráty - Trhovisko{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-3">
+        <!-- Sidebar s filtrami -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Filtre</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('listings') }}">
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Kategória</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="">Všetky kategórie</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>
+                                {{ category.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label for="min_price" class="form-label">Min cena (€)</label>
+                            <input type="number" class="form-control" id="min_price" name="min_price"
+                                   value="{{ request.args.get('min_price', '') }}" placeholder="0">
+                        </div>
+                        <div class="col">
+                            <label for="max_price" class="form-label">Max cena (€)</label>
+                            <input type="number" class="form-control" id="max_price" name="max_price"
+                                   value="{{ request.args.get('max_price', '') }}" placeholder="9999">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="location" class="form-label">Lokalita</label>
+                        <input type="text" class="form-control" id="location" name="location"
+                               value="{{ request.args.get('location', '') }}" placeholder="Zadajte lokalitu">
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Filtrovať</button>
+                        <a href="{{ url_for('listings') }}" class="btn btn-outline-secondary mt-2">Zrušiť filtre</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        <!-- Hlavný obsah s inzerátmi -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">Všetky inzeráty</h1>
+            <div>
+                <span class="text-muted">{{ total_listings }} inzerátov</span>
+            </div>
+        </div>
+
+        {% if not listings %}
+        <div class="alert alert-info">
+            Momentálne nie sú k dispozícii žiadne inzeráty.
+            {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('register') }}" class="alert-link">Zaregistrujte sa</a> a pridajte prvý!
+            {% endif %}
+        </div>
+        {% else %}
+        <!-- Zobrazenie inzerátov v mriežke -->
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for listing in listings %}
+            <div class="col">
+                <div class="card h-100 listing-card">
+                    <!-- Obrázok inzerátu -->
+                    <div class="position-relative">
+                        {% if listing.images %}
+                        <img src="{{ url_for('static', filename='uploads/' + listing.images[0].filename) }}"
+                             class="card-img-top" alt="{{ listing.title }}" style="height: 200px; object-fit: cover;">
+                        {% else %}
+                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center"
+                             style="height: 200px;">
+                            <span class="text-muted">Žiadny obrázok</span>
+                        </div>
+                        {% endif %}
+
+                        <!-- Status badge -->
+                        <span class="position-absolute top-0 start-0 m-2">
+                            {% if listing.status == 'sold' %}
+                            <span class="badge bg-danger">Predané</span>
+                            {% elif listing.status == 'expired' %}
+                            <span class="badge bg-secondary">Expirované</span>
+                            {% else %}
+                            <span class="badge bg-success">Aktívne</span>
+                            {% endif %}
+                        </span>
+
+                        <!-- Cena -->
+                        <span class="position-absolute bottom-0 end-0 m-2">
+                            <span class="badge bg-primary fs-6">{{ listing.price }} €</span>
+                        </span>
+                    </div>
+
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <a href="{{ url_for('listing_detail', id=listing.id) }}" class="text-decoration-none text-dark">
+                                {{ listing.title }}
+                            </a>
+                        </h5>
+
+                        <p class="card-text text-muted small mb-2">
+                            <i class="bi bi-geo-alt"></i> {{ listing.location }}
+                        </p>
+
+                        <p class="card-text small text-truncate" style="max-height: 60px;">
+                            {{ listing.description }}
+                        </p>
+
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <small class="text-muted">
+                                <i class="bi bi-clock"></i> {{ listing.created_at.strftime('%d.%m.%Y') }}
+                            </small>
+                            <small class="text-muted">
+                                <i class="bi bi-folder"></i> {{ listing.category.name }}
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('listing_detail', id=listing.id) }}" class="btn btn-sm btn-outline-primary">
+                                Detail
+                            </a>
+
+                            {% if current_user.is_authenticated %}
+                            <button class="btn btn-sm btn-outline-secondary favorite-btn"
+                                    data-listing-id="{{ listing.id }}">
+                                <i class="bi bi-heart"></i> Obľúbené
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Pagination -->
+        {% if pagination.pages > 1 %}
+        <nav class="mt-5">
+            <ul class="pagination justify-content-center">
+                {% if pagination.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('listings', page=pagination.prev_num, **request.args) }}">
+                        Predchádzajúca
+                    </a>
+                </li>
+                {% endif %}
+
+                {% for page_num in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+                    {% if page_num %}
+                        <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('listings', page=page_num, **request.args) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if pagination.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('listings', page=pagination.next_num, **request.args) }}">
+                        Ďalšia
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// JavaScript pre obľúbené inzeráty
+document.querySelectorAll('.favorite-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const listingId = this.dataset.listingId;
+
+        fetch(`/api/favorite/${listingId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const icon = this.querySelector('i');
+                if (data.favorited) {
+                    icon.className = 'bi bi-heart-fill text-danger';
+                    this.classList.add('active');
+                } else {
+                    icon.className = 'bi bi-heart';
+                    this.classList.remove('active');
+                }
+            }
+        });
+    });
+});
+
+// Filtrovanie podľa ceny
+document.getElementById('min_price')?.addEventListener('input', function() {
+    const maxPrice = document.getElementById('max_price');
+    if (parseInt(this.value) > parseInt(maxPrice.value)) {
+        maxPrice.value = this.value;
+    }
+});
+</script>
+{% endblock %}

@@ -3,84 +3,253 @@
 {% block title %}Domov - Trhovisko{% endblock %}
 
 {% block content %}
-    <div class="row">
-        <div class="col-md-8">
-            <h1 class="mb-4">Vitajte na Trhovisku</h1>
-            <p class="lead">Moderný inzerčný portál pre jednoduché a rýchle obchodovanie.</p>
+<div class="row">
+    <div class="col-md-8">
+        <h1 class="mb-4">Vitajte na Trhovisku</h1>
+        <p class="lead">Moderný inzerčný portál pre jednoduché a rýchle obchodovanie.</p>
+
+        {% if not current_user.is_authenticated %}
+        <div class="alert alert-info mt-4">
+            <h4 class="alert-heading">Prečo sa zaregistrovať?</h4>
+            <ul class="mb-0">
+                <li>Pridávajte vlastné inzeráty</li>
+                <li>Ukladajte si obľúbené ponuky</li>
+                <li>Komunikujte s predávajúcimi</li>
+                <li>Sledujte stav svojich inzerátov</li>
+            </ul>
         </div>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Rýchle vyhľadávanie</h5>
-                    <form>
-                        <div class="mb-3">
-                            <input type="text" class="form-control" placeholder="Čo hľadáte?">
-                        </div>
-                        <div class="mb-3">
-                            <select class="form-select">
-                                <option selected>Všetky kategórie</option>
-                                <option>Elektronika</option>
-                                <option>Oblečenie</option>
-                                <option>Nábytok</option>
-                                <option>Autá</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">Hľadať</button>
-                    </form>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Rýchle vyhľadávanie</h5>
+                <form method="GET" action="{{ url_for('listings') }}">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" placeholder="Čo hľadáte?" name="q">
+                    </div>
+                    <div class="mb-3">
+                        <select class="form-select" name="category">
+                            <option selected value="">Všetky kategórie</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Hľadať</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Rýchle štatistiky -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5 class="card-title">Štatistiky</h5>
+                <ul class="list-unstyled">
+                    <li class="mb-2">
+                        <i class="bi bi-box text-primary"></i>
+                        <strong>{{ latest_listings|length }}</strong> aktívnych inzerátov
+                    </li>
+                    <li class="mb-2">
+                        <i class="bi bi-people text-success"></i>
+                        <strong>{{ categories|length }}</strong> kategórií
+                    </li>
+                    {% if current_user.is_authenticated %}
+                    <li>
+                        <i class="bi bi-person text-warning"></i>
+                        Vitajte späť, <strong>{{ current_user.username }}</strong>!
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr class="my-5">
+
+<h2 class="mb-4">Najnovšie inzeráty</h2>
+
+{% if latest_listings %}
+<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4" id="listings-container">
+    {% for listing in latest_listings %}
+    <div class="col">
+        <div class="card h-100 shadow-sm">
+            <!-- Obrázok inzerátu -->
+            <div class="position-relative" style="height: 200px; overflow: hidden;">
+                {% if listing.images %}
+                <img src="{{ url_for('static', filename='uploads/' + listing.images[0].filename) }}"
+                     class="card-img-top h-100 w-100"
+                     alt="{{ listing.title }}"
+                     style="object-fit: cover;">
+                {% else %}
+                <div class="card-img-top bg-light d-flex align-items-center justify-content-center h-100">
+                    <div class="text-center text-muted">
+                        <i class="bi bi-image" style="font-size: 3rem;"></i>
+                        <p class="mt-2">Žiadny obrázok</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Status badge -->
+                <span class="position-absolute top-0 start-0 m-2">
+                    {% if listing.status == 'active' %}
+                    <span class="badge bg-success">Aktívne</span>
+                    {% elif listing.status == 'sold' %}
+                    <span class="badge bg-danger">Predané</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Expirované</span>
+                    {% endif %}
+                </span>
+
+                <!-- Cena -->
+                <span class="position-absolute bottom-0 end-0 m-2">
+                    <span class="badge bg-primary fs-6">{{ listing.price }} €</span>
+                </span>
+            </div>
+
+            <div class="card-body">
+                <h5 class="card-title">
+                    <a href="{{ url_for('listing_detail', id=listing.id) }}"
+                       class="text-decoration-none text-dark">
+                        {{ listing.title[:50] }}{% if listing.title|length > 50 %}...{% endif %}
+                    </a>
+                </h5>
+
+                <p class="card-text text-muted small">
+                    <i class="bi bi-geo-alt"></i> {{ listing.location }}
+                </p>
+
+                <p class="card-text">
+                    {{ listing.description[:100] }}{% if listing.description|length > 100 %}...{% endif %}
+                </p>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="bi bi-clock"></i> {{ listing.created_at.strftime('%d.%m.%Y') }}
+                    </small>
+                    <small class="text-muted">
+                        <i class="bi bi-folder"></i> {{ listing.category.name }}
+                    </small>
+                </div>
+            </div>
+
+            <div class="card-footer bg-transparent">
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('listing_detail', id=listing.id) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye"></i> Detail
+                    </a>
+
+                    {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('send_message', listing_id=listing.id) }}"
+                       class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-envelope"></i> Kontakt
+                    </a>
+                    {% else %}
+                    <button class="btn btn-sm btn-outline-secondary"
+                            onclick="showLoginAlert()">
+                        <i class="bi bi-envelope"></i> Kontakt
+                    </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
+    {% endfor %}
+</div>
 
-    <hr class="my-5">
+<div class="text-center mt-4">
+    <a href="{{ url_for('listings') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-list"></i> Zobraziť všetky inzeráty
+    </a>
 
-    <h2 class="mb-4">Najnovšie inzeráty</h2>
-    <div class="row" id="listings-container">
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card h-100">
-                <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="Inzerát">
-                <div class="card-body">
-                    <h5 class="card-title">iPhone 13 Pro Max</h5>
-                    <p class="card-text">Výborný stav, 256GB, záruka do 12/2024.</p>
-                    <p class="fw-bold text-primary">850 €</p>
-                    <p class="text-muted"><small>Bratislava • Dnes</small></p>
-                </div>
-                <div class="card-footer">
-                    <a href="#" class="btn btn-outline-primary btn-sm">Detail</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card h-100">
-                <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="Inzerát">
-                <div class="card-body">
-                    <h5 class="card-title">Knižnica drevená</h5>
-                    <p class="card-text">Pevná, tmavá drevená knižnica, rozmer 180x80x40 cm.</p>
-                    <p class="fw-bold text-primary">120 €</p>
-                    <p class="text-muted"><small>Košice • Včera</small></p>
-                </div>
-                <div class="card-footer">
-                    <a href="#" class="btn btn-outline-primary btn-sm">Detail</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card h-100">
-                <img src="https://via.placeholder.com/300x200" class="card-img-top" alt="Inzerát">
-                <div class="card-body">
-                    <h5 class="card-title">Bicykel MTB</h5>
-                    <p class="card-text">Horský bicykel 27", 21 rýchlostí, nový.</p>
-                    <p class="fw-bold text-primary">350 €</p>
-                    <p class="text-muted"><small>Žilina • Pred 2 dňami</small></p>
-                </div>
-                <div class="card-footer">
-                    <a href="#" class="btn btn-outline-primary btn-sm">Detail</a>
-                </div>
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('new_listing') }}" class="btn btn-success btn-lg ms-2">
+        <i class="bi bi-plus-circle"></i> Pridať nový inzerát
+    </a>
+    {% else %}
+    <a href="{{ url_for('register') }}" class="btn btn-success btn-lg ms-2">
+        <i class="bi bi-person-plus"></i> Zaregistrovať sa a pridávať
+    </a>
+    {% endif %}
+</div>
+
+{% else %}
+<div class="alert alert-warning">
+    <h4 class="alert-heading">Žiadne inzeráty</h4>
+    <p>Momentálne nie sú v systéme žiadne aktívne inzeráty.</p>
+
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('new_listing') }}" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> Pridať prvý inzerát
+    </a>
+    {% else %}
+    <p>Buďte prvý! <a href="{{ url_for('register') }}" class="alert-link">Zaregistrujte sa</a>
+    a pridajte svoj inzerát.</p>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Kategórie -->
+<h2 class="mb-4 mt-5">Prehľad kategórií</h2>
+<div class="row">
+    {% for category in categories %}
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card category-card">
+            <div class="card-body text-center">
+                <i class="bi bi-folder display-6 text-primary mb-3"></i>
+                <h5 class="card-title">{{ category.name }}</h5>
+                <p class="card-text small text-muted">
+                    {{ category.listings|length }} inzerátov
+                </p>
+                <a href="{{ url_for('listings') }}?category={{ category.id }}"
+                   class="btn btn-outline-primary btn-sm">
+                    Zobraziť
+                </a>
             </div>
         </div>
     </div>
+    {% endfor %}
+</div>
+{% endblock %}
 
-    <div class="text-center mt-4">
-        <a href="#" class="btn btn-primary">Zobraziť všetky inzeráty</a>
-    </div>
+{% block scripts %}
+<script>
+function showLoginAlert() {
+    alert('Pre kontaktovanie predávajúceho sa musíte prihlásiť!');
+}
+
+// Pridanie interaktivity pre karty
+document.querySelectorAll('.category-card').forEach(card => {
+    card.addEventListener('mouseenter', function() {
+        this.style.transform = 'translateY(-5px)';
+        this.style.transition = 'transform 0.2s';
+    });
+
+    card.addEventListener('mouseleave', function() {
+        this.style.transform = 'translateY(0)';
+    });
+});
+</script>
+
+<style>
+.category-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #e0e0e0;
+}
+
+.category-card:hover {
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.card-img-top {
+    transition: transform 0.3s;
+}
+
+.card:hover .card-img-top {
+    transform: scale(1.05);
+}
+</style>
 {% endblock %}

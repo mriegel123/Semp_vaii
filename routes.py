@@ -12,7 +12,18 @@ def register_routes(app):
 
     @app.route('/')
     def home():
-        return render_template('index.html')
+        # Získanie kategórií pre vyhľadávací formulár
+        categories = Category.query.all()
+
+        # Získanie 6 najnovších aktívnych inzerátov
+        latest_listings = Listing.query.filter_by(status='active') \
+            .order_by(Listing.created_at.desc()) \
+            .limit(6) \
+            .all()
+
+
+
+        return render_template('index.html', categories = categories, latest_listings=latest_listings)
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
@@ -175,6 +186,22 @@ def register_routes(app):
 
         return jsonify(listings_data)
 
+    @app.route('/listings/<int:id>')
+    def listing_detail(id):
+        listing = Listing.query.get_or_404(id)
+
+        # Získanie podobných inzerátov (z rovnakej kategórie)
+        similar_listings = Listing.query \
+            .filter(Listing.category_id == listing.category_id,
+                    Listing.id != listing.id,
+                    Listing.status == 'active') \
+            .order_by(Listing.created_at.desc()) \
+            .limit(4) \
+            .all()
+
+        return render_template('listing_detail.html',
+                               listing=listing,
+                               similar_listings=similar_listings)
     @app.route('/listings/<int:id>/edit', methods=['GET', 'POST'])
     @login_required
     def edit_listing(id):
@@ -200,6 +227,101 @@ def register_routes(app):
 
         return render_template('edit_listing.html', form=form, listing=listing)
 
+    @app.route('/listings')
+    def listings():
+        # Získanie všetkých aktívnych inzerátov
+        all_listings = Listing.query.filter_by(status='active').order_by(Listing.created_at.desc()).all()
+
+        # Pagination (voliteľné)
+        page = request.args.get('page', 1, type=int)
+        per_page = 12  # Počet inzerátov na stránku
+
+        paginated_listings = Listing.query.filter_by(status='active') \
+            .order_by(Listing.created_at.desc()) \
+            .paginate(page=page, per_page=per_page, error_out=False)
+
+        return render_template('listings.html',
+                               listings=paginated_listings.items,
+                               pagination=paginated_listings)
+
+
+    # Route pre odoslanie správy
+    @app.route('/send-message', methods=['POST'])
+    @login_required
+    def send_message():
+        receiver_id = request.form.get('receiver_id')
+        listing_id = request.form.get('listing_id')
+        content = request.form.get('content')
+
+        if not receiver_id or not content:
+            flash('Chýbajúce údaje.', 'danger')
+            return redirect(request.referrer or url_for('home'))
+
+        message = Message(
+            sender_id=current_user.id,
+            receiver_id=receiver_id,
+            listing_id=listing_id,
+            content=content
+        )
+
+        try:
+            db.session.add(message)
+            db.session.commit()
+            flash('Správa bola odoslaná.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash('Chyba pri odosielaní správy.', 'danger')
+
+        return redirect(request.referrer or url_for('home'))
+
+    # Route pre obľúbené
+    @app.route('/toggle-favorite', methods=['POST'])
+    @login_required
+    def toggle_favorite():
+        listing_id = request.form.get('listing_id')
+
+        if not listing_id:
+            flash('Chýbajúce údaje.', 'danger')
+            return redirect(request.referrer or url_for('home'))
+
+        # Skontrolovať, či už je inzerát v obľúbených
+        favorite = Favorite.query.filter_by(
+            user_id=current_user.id,
+            listing_id=listing_id
+        ).first()
+
+        if favorite:
+            # Odstrániť z obľúbených
+            db.session.delete(favorite)
+            action = 'odstránený'
+        else:
+            # Pridať do obľúbených
+            favorite = Favorite(
+                user_id=current_user.id,
+                listing_id=listing_id
+            )
+            db.session.add(favorite)
+            action = 'pridaný'
+
+        try:
+            db.session.commit()
+            flash(f'Inzerát bol {action} do obľúbených.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash('Chyba pri ukladaní.', 'danger')
+
+        return redirect(request.referrer or url_for('home'))
+
+    # API endpoint pre kontrolu obľúbených
+    @app.route('/api/check-favorite/<int:listing_id>')
+    @login_required
+    def check_favorite(listing_id):
+        favorite = Favorite.query.filter_by(
+            user_id=current_user.id,
+            listing_id=listing_id
+        ).first()
+
+        return jsonify({'is_favorite': favorite is not None})
     @app.route('/listings/<int:id>/delete', methods=['POST'])
     @login_required
     def delete_listing(id):
