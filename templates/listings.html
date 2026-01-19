@@ -155,12 +155,13 @@
         </div>
 
         <!-- Pagination -->
+        <!-- Pagination -->
         {% if pagination.pages > 1 %}
         <nav class="mt-5">
             <ul class="pagination justify-content-center">
                 {% if pagination.has_prev %}
                 <li class="page-item">
-                    <a class="page-link" href="{{ url_for('listings', page=pagination.prev_num, **request.args) }}">
+                    <a class="page-link" href="{{ url_for('listings', page=pagination.prev_num) }}{% if request.args %}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}{% if not loop.last %}&{% endif %}{% endif %}{% endfor %}{% endif %}">
                         Predchádzajúca
                     </a>
                 </li>
@@ -169,7 +170,7 @@
                 {% for page_num in pagination.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
                     {% if page_num %}
                         <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
-                            <a class="page-link" href="{{ url_for('listings', page=page_num, **request.args) }}">
+                            <a class="page-link" href="{{ url_for('listings', page=page_num) }}{% if request.args %}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}{% if not loop.last %}&{% endif %}{% endif %}{% endfor %}{% endif %}">
                                 {{ page_num }}
                             </a>
                         </li>
@@ -182,7 +183,7 @@
 
                 {% if pagination.has_next %}
                 <li class="page-item">
-                    <a class="page-link" href="{{ url_for('listings', page=pagination.next_num, **request.args) }}">
+                    <a class="page-link" href="{{ url_for('listings', page=pagination.next_num) }}{% if request.args %}&{% for key, value in request.args.items() %}{% if key != 'page' %}{{ key }}={{ value }}{% if not loop.last %}&{% endif %}{% endif %}{% endfor %}{% endif %}">
                         Ďalšia
                     </a>
                 </li>
@@ -196,33 +197,9 @@
 {% endblock %}
 
 {% block scripts %}
+    <script src="{{ url_for('static', filename='js/favorites.js') }}"></script>
 <script>
-// JavaScript pre obľúbené inzeráty
-document.querySelectorAll('.favorite-btn').forEach(button => {
-    button.addEventListener('click', function() {
-        const listingId = this.dataset.listingId;
 
-        fetch(`/api/favorite/${listingId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const icon = this.querySelector('i');
-                if (data.favorited) {
-                    icon.className = 'bi bi-heart-fill text-danger';
-                    this.classList.add('active');
-                } else {
-                    icon.className = 'bi bi-heart';
-                    this.classList.remove('active');
-                }
-            }
-        });
-    });
-});
 
 // Filtrovanie podľa ceny
 document.getElementById('min_price')?.addEventListener('input', function() {

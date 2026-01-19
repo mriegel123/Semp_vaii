@@ -14,7 +14,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def register_routes(app):
-    """Registruje všetky route handlers do aplikácie"""
+    """Tu sa registrujú všetky routes aplikácie."""
 
     @app.route('/')
     def home():
@@ -349,7 +349,40 @@ def register_routes(app):
                                selected_category=category_id,
                                total_listings=query.count())
 
-    # Pridajte túto funkciu do routes.py
+
+    @app.route('/api/my-favorites')
+    @login_required
+    def api_my_favorites():
+        # Získať ID obľúbených inzerátov používateľa
+        favorite_ids = [f.listing_id for f in current_user.favorites]
+
+        # Získať samotné inzeráty
+        listings = Listing.query.filter(Listing.id.in_(favorite_ids)).all()
+
+        listings_data = []
+        for listing in listings:
+            # Získať URL prvého obrázka, ak existuje
+            image_url = None
+            if listing.images and len(listing.images) > 0:
+                image_url = url_for('static', filename='uploads/' + listing.images[0].filename)
+
+            listings_data.append({
+                'id': listing.id,
+                'title': listing.title,
+                'description': listing.description,
+                'price': listing.price,
+                'location': listing.location,
+                'status': listing.status,
+                'created_at': listing.created_at.strftime('%d.%m.%Y') if listing.created_at else 'N/A',
+                'category_name': listing.category.name if listing.category else 'Bez kategórie',
+                'image_url': image_url,
+                'has_images': len(listing.images) > 0,
+                'author': listing.author.username,
+                'is_favorite': True  # Vždy true, lebo sú to obľúbené
+            })
+
+        return jsonify(listings_data)
+    # mazanie inzeratu
     @app.route('/listings/<int:listing_id>/images/<int:image_id>/delete', methods=['DELETE'])
     @login_required
     def delete_image(listing_id, image_id):
@@ -409,6 +442,41 @@ def register_routes(app):
 
         return redirect(request.referrer or url_for('home'))
 
+    @app.route('/api/favorite/<int:listing_id>', methods=['POST'])
+    @login_required
+    def api_favorite(listing_id):
+        # Skontrolovať, či už je inzerát v obľúbených
+        favorite = Favorite.query.filter_by(
+            user_id=current_user.id,
+            listing_id=listing_id
+        ).first()
+
+        if favorite:
+            # Odstrániť z obľúbených
+            db.session.delete(favorite)
+            action = 'odstránený'
+            favorited = False
+        else:
+            # Pridať do obľúbených
+            favorite = Favorite(
+                user_id=current_user.id,
+                listing_id=listing_id
+            )
+            db.session.add(favorite)
+            action = 'pridaný'
+            favorited = True
+
+        try:
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Inzerát bol {action} do obľúbených.',
+                'favorited': favorited
+            }), 200
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri ukladaní: {e}")
+            return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
     # Route pre obľúbené
     @app.route('/toggle-favorite', methods=['POST'])
     @login_required
@@ -416,8 +484,7 @@ def register_routes(app):
         listing_id = request.form.get('listing_id')
 
         if not listing_id:
-            flash('Chýbajúce údaje.', 'danger')
-            return redirect(request.referrer or url_for('home'))
+            return jsonify({'success': False, 'message': 'Chýbajúce údaje.'}), 400
 
         # Skontrolovať, či už je inzerát v obľúbených
         favorite = Favorite.query.filter_by(
@@ -429,6 +496,7 @@ def register_routes(app):
             # Odstrániť z obľúbených
             db.session.delete(favorite)
             action = 'odstránený'
+            favorited = False
         else:
             # Pridať do obľúbených
             favorite = Favorite(
@@ -437,15 +505,19 @@ def register_routes(app):
             )
             db.session.add(favorite)
             action = 'pridaný'
+            favorited = True
 
         try:
             db.session.commit()
-            flash(f'Inzerát bol {action} do obľúbených.', 'success')
+            return jsonify({
+                'success': True,
+                'message': f'Inzerát bol {action} do obľúbených.',
+                'favorited': favorited
+            }), 200
         except Exception as e:
             db.session.rollback()
-            flash('Chyba pri ukladaní.', 'danger')
-
-        return redirect(request.referrer or url_for('home'))
+            print(f"Chyba pri ukladaní: {e}")
+            return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
 
     # API endpoint pre kontrolu obľúbených
     @app.route('/api/check-favorite/<int:listing_id>')

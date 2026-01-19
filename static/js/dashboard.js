@@ -308,7 +308,187 @@ function changePassword() {
         }
     });
 }
+// Funkcia na načítanie obľúbených inzerátov
+function loadUserFavorites() {
+    const loadingElement = document.getElementById('favorites-loading');
+    if (loadingElement) {
+        loadingElement.style.display = 'block';
+    }
 
+    fetch('/api/my-favorites')
+        .then(response => response.json())
+        .then(listings => {
+            const container = document.getElementById('user-favorites');
+            let htmlContent = '';
+
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+
+            if (listings.length === 0) {
+                htmlContent = `
+                    <div class="col-12">
+                        <div class="alert alert-info text-center">
+                            <i class="bi bi-heart display-4 mb-3 text-danger"></i>
+                            <h4 class="alert-heading">Zatiaľ nemáte žiadne obľúbené inzeráty</h4>
+                            <p>Prechádzajte inzeráty a pridávajte si do obľúbených tie, ktoré sa vám páčia!</p>
+                            <a href="{{ url_for('listings') }}" class="btn btn-danger mt-2">
+                                <i class="bi bi-search"></i> Prehľadávať inzeráty
+                            </a>
+                        </div>
+                    </div>
+                `;
+            } else {
+                listings.forEach(listing => {
+                    // Použite skutočný obrázok alebo placeholder
+                    let imageUrl = listing.image_url;
+                    if (!imageUrl) {
+                        // Použite placeholder s textom z titulu
+                        const placeholderText = encodeURIComponent(listing.title.substring(0, 15));
+                        imageUrl = `https://via.placeholder.com/300x200/6c757d/ffffff?text=${placeholderText}`;
+                    }
+
+                    const priceFormatted = listing.price ? `${listing.price} €` : 'Dohodou';
+                    const createdAt = listing.created_at || 'Nedátované';
+
+                    // Bezpečne získať popis (ak existuje)
+                    const description = listing.description || 'Bez popisu';
+                    const shortDescription = description.length > 100 ? description.substring(0, 100) + '...' : description;
+
+                    // Určiť farbu badge podľa statusu
+                    let statusBadgeClass = 'bg-secondary';
+                    let statusText = 'Neznámy';
+
+                    switch(listing.status) {
+                        case 'active':
+                            statusBadgeClass = 'bg-success';
+                            statusText = 'Aktívny';
+                            break;
+                        case 'sold':
+                            statusBadgeClass = 'bg-danger';
+                            statusText = 'Predaný';
+                            break;
+                        case 'expired':
+                            statusBadgeClass = 'bg-warning';
+                            statusText = 'Expirovaný';
+                            break;
+                    }
+
+                    htmlContent += `
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="position-relative">
+                                    <img src="${imageUrl}" 
+                                         class="card-img-top img-thumbnail" 
+                                         alt="${listing.title}" 
+                                         style="height: 200px; object-fit: cover;">
+                                    <span class="position-absolute top-0 start-0 m-2 badge ${statusBadgeClass}">
+                                        ${statusText}
+                                    </span>
+                                    <span class="position-absolute top-0 end-0 m-2 heart-favorite">
+                                        <i class="bi bi-heart-fill fs-4 text-danger"></i>
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <h5 class="card-title">${listing.title}</h5>
+                                    <p class="card-text text-muted small">
+                                        <i class="bi bi-geo-alt"></i> ${listing.location || 'Neuvedené'}
+                                    </p>
+                                    <p class="card-text">${shortDescription}</p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="h5 text-primary mb-0">${priceFormatted}</span>
+                                        <small class="text-muted">
+                                            <i class="bi bi-person"></i> ${listing.author}
+                                        </small>
+                                    </div>
+                                    <p class="mt-2 mb-1">
+                                        <span class="badge bg-info">
+                                            <i class="bi bi-tag"></i> ${listing.category_name || 'Bez kategórie'}
+                                        </span>
+                                        <small class="text-muted ms-2">
+                                            <i class="bi bi-calendar"></i> ${createdAt}
+                                        </small>
+                                    </p>
+                                </div>
+                                <div class="card-footer bg-transparent d-flex justify-content-between">
+                                    <a href="/listings/${listing.id}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Zobraziť
+                                    </a>
+                                    <form method="POST" action="/toggle-favorite" class="d-inline">
+                                        <input type="hidden" name="listing_id" value="${listing.id}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-heart-fill"></i> Odobrať z obľúbených
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            if (container) {
+                container.innerHTML = htmlContent;
+
+                // Pridanie event listenerov pre formuláre na odstránenie z obľúbených
+                container.querySelectorAll('form').forEach(form => {
+                    form.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        removeFromFavorites(this);
+                    });
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Chyba pri načítaní obľúbených inzerátov:', error);
+            const container = document.getElementById('user-favorites');
+            if (container) {
+                container.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger text-center">
+                            <i class="bi bi-exclamation-triangle display-4 mb-3"></i>
+                            <h4 class="alert-heading">Chyba pri načítaní obľúbených inzerátov</h4>
+                            <p>Skúste znova neskôr alebo obnovte stránku.</p>
+                            <button onclick="loadUserFavorites()" class="btn btn-outline-danger mt-2">
+                                <i class="bi bi-arrow-clockwise"></i> Skúsiť znova
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const loadingElement = document.getElementById('favorites-loading');
+            if (loadingElement) {
+                loadingElement.style.display = 'none';
+            }
+        });
+}
+
+// Funkcia na odstránenie z obľúbených
+function removeFromFavorites(form) {
+    const formData = new FormData(form);
+    const listingId = formData.get('listing_id');
+
+    fetch('/toggle-favorite', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.redirected) {
+            // Flask vráti redirect, musíme znova načítať obľúbené
+            loadUserFavorites();
+        }
+        return response.text();
+    })
+    .then(() => {
+        // Po úspešnom odstránení znova načítať obľúbené
+        loadUserFavorites();
+    })
+    .catch(error => {
+        console.error('Chyba pri odstraňovaní z obľúbených:', error);
+        alert('Chyba pri odstraňovaní z obľúbených');
+    });
+}
 
 // --- 4. DOM READY LOGIC ---
 
@@ -326,6 +506,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const target = this.getAttribute('href').substring(1);
             if (target === 'listings') {
                 loadUserListings();
+            } else if (target === 'favorites') {
+                loadUserFavorites();
             } else if (target === 'change-password') {
                 // Vyčistíme formulár a chyby pri prepnutí na tab
                 const changePasswordForm = document.getElementById('changePasswordForm');

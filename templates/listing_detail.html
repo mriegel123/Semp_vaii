@@ -85,7 +85,14 @@
         </div>
         {% endif %}
     </div>
-
+        <h3 class="h4 mb-3">Popis</h3>
+    <div class="bg-light p-3 rounded">
+    {% if listing.description %}
+        <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">{{ listing.description }}</pre>
+    {% else %}
+        <p class="text-muted mb-0">Tento inzerát nemá popis.</p>
+    {% endif %}
+    </div>
             <!-- Kontaktný formulár -->
             {% if current_user.is_authenticated and current_user.id != listing.user_id and listing.status == 'active' %}
             <div class="card">
