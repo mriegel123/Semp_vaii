@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
 from extensions import db
-from sqlalchemy import or_, desc
+from sqlalchemy import or_, desc, and_
 from models import User, Category, Listing, Image, Message, Favorite
 from forms import RegistrationForm, LoginForm, ListingForm, ChangePasswordForm
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -686,44 +686,47 @@ def register_routes(app):
     @app.route('/api/conversations')
     @login_required
     def api_conversations():
-        # Získanie unikátnych konverzácií (zoskupené podľa druhého používateľa a inzerátu)
-        subquery = db.session.query(
-            Message.sender_id,
-            Message.receiver_id,
-            Message.listing_id,
-            db.func.max(Message.created_at).label('last_message_time')
-        ).filter(
-            (Message.sender_id == current_user.id) | (Message.receiver_id == current_user.id)
-        ).group_by(
-            db.func.least(Message.sender_id, Message.receiver_id),
-            db.func.greatest(Message.sender_id, Message.receiver_id),
-            Message.listing_id
-        ).subquery()
-
-        # Získanie posledných správ z každej konverzácie
-        latest_messages = db.session.query(Message).join(
-            subquery,
-            and_(
-                Message.sender_id == subquery.c.sender_id,
-                Message.receiver_id == subquery.c.receiver_id,
-                Message.listing_id == subquery.c.listing_id,
-                Message.created_at == subquery.c.last_message_time
+        # Získanie všetkých správ kde je používateľ odosielateľ alebo príjemca
+        all_messages = Message.query.filter(
+            or_(
+                Message.sender_id == current_user.id,
+                Message.receiver_id == current_user.id
             )
         ).order_by(desc(Message.created_at)).all()
 
-        conversations = []
-        for msg in latest_messages:
+        # Zoskupenie správ podľa konverzácie (druhý používateľ + listing)
+        # Kľúč: (other_user_id, listing_id)
+        conversations_dict = {}
+
+        for msg in all_messages:
             # Určiť druhého používateľa v konverzácii
+            other_user_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
+            listing_id = msg.listing_id
+
+            key = (other_user_id, listing_id)
+
+            # Ak ešte nemáme túto konverzáciu, pridáme ju (správy sú zoradené od najnovšej)
+            if key not in conversations_dict:
+                conversations_dict[key] = msg
+
+        # Vytvoriť zoznam konverzácií
+        conversations = []
+        for (other_user_id, listing_id), msg in conversations_dict.items():
             other_user = msg.receiver if msg.sender_id == current_user.id else msg.sender
             listing = msg.listing
 
             # Počet neprečítaných správ od druhého používateľa
-            unread_count = Message.query.filter(
-                Message.sender_id == other_user.id,
+            unread_query = Message.query.filter(
+                Message.sender_id == other_user_id,
                 Message.receiver_id == current_user.id,
-                Message.listing_id == msg.listing_id,
                 Message.is_read == False
-            ).count()
+            )
+            if listing_id is not None:
+                unread_query = unread_query.filter(Message.listing_id == listing_id)
+            else:
+                unread_query = unread_query.filter(Message.listing_id.is_(None))
+
+            unread_count = unread_query.count()
 
             conversations.append({
                 'other_user_id': other_user.id,
@@ -735,6 +738,9 @@ def register_routes(app):
                 'is_sender': msg.sender_id == current_user.id,
                 'unread_count': unread_count
             })
+
+        # Zoradiť podľa času poslednej správy (najnovšie prvé)
+        conversations.sort(key=lambda x: x['last_message_time'], reverse=True)
 
         return jsonify(conversations)
 

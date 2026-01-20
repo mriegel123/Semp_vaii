@@ -231,6 +231,20 @@ function updateUnreadCount() {
 
 // Inicializácia
 document.addEventListener('DOMContentLoaded', function() {
+    // Načítanie konverzácií pri aktivácii tabu "Správy"
+    const messagesTabLink = document.querySelector('a[href="#messages"]');
+    if (messagesTabLink) {
+        messagesTabLink.addEventListener('shown.bs.tab', function() {
+            loadConversations();
+        });
+
+        // Ak je tab Správy aktívny pri načítaní stránky, načítame konverzácie
+        const messagesTab = document.getElementById('messages');
+        if (messagesTab && (messagesTab.classList.contains('active') || messagesTab.classList.contains('show'))) {
+            loadConversations();
+        }
+    }
+
     // Auto-refresh konverzácií každých 30 sekúnd
     refreshInterval = setInterval(() => {
         const messagesTab = document.getElementById('messages');
