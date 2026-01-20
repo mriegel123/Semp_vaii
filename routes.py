@@ -237,9 +237,15 @@ def register_routes(app):
             .limit(4) \
             .all()
 
+        # Získanie ID obľúbených inzerátov aktuálneho používateľa
+        current_user_favorites = []
+        if current_user.is_authenticated:
+            current_user_favorites = [f.listing_id for f in current_user.favorites]
+
         return render_template('listing_detail.html',
                                listing=listing,
-                               similar_listings=similar_listings)
+                               similar_listings=similar_listings,
+                               current_user_favorites=current_user_favorites)
 
     @app.route('/listings/<int:id>/edit', methods=['GET', 'POST'])
     @login_required
@@ -477,14 +483,18 @@ def register_routes(app):
             db.session.rollback()
             print(f"Chyba pri ukladaní: {e}")
             return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
-    # Route pre obľúbené
+    # Route pre obľúbené (podporuje AJAX aj formulárový POST)
     @app.route('/toggle-favorite', methods=['POST'])
     @login_required
     def toggle_favorite():
         listing_id = request.form.get('listing_id')
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'multipart/form-data'
 
         if not listing_id:
-            return jsonify({'success': False, 'message': 'Chýbajúce údaje.'}), 400
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Chýbajúce údaje.'}), 400
+            flash('Chýbajúce údaje.', 'danger')
+            return redirect(request.referrer or url_for('home'))
 
         # Skontrolovať, či už je inzerát v obľúbených
         favorite = Favorite.query.filter_by(
@@ -495,7 +505,7 @@ def register_routes(app):
         if favorite:
             # Odstrániť z obľúbených
             db.session.delete(favorite)
-            action = 'odstránený'
+            action = 'odstránený z'
             favorited = False
         else:
             # Pridať do obľúbených
@@ -504,20 +514,26 @@ def register_routes(app):
                 listing_id=listing_id
             )
             db.session.add(favorite)
-            action = 'pridaný'
+            action = 'pridaný do'
             favorited = True
 
         try:
             db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': f'Inzerát bol {action} do obľúbených.',
-                'favorited': favorited
-            }), 200
+            if is_ajax:
+                return jsonify({
+                    'success': True,
+                    'message': f'Inzerát bol {action} obľúbených.',
+                    'favorited': favorited
+                }), 200
+            flash(f'Inzerát bol {action} obľúbených.', 'success')
         except Exception as e:
             db.session.rollback()
             print(f"Chyba pri ukladaní: {e}")
-            return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
+            flash('Chyba pri ukladaní.', 'danger')
+
+        return redirect(request.referrer or url_for('listing_detail', id=listing_id))
 
     # API endpoint pre kontrolu obľúbených
     @app.route('/api/check-favorite/<int:listing_id>')
