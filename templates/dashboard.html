@@ -23,6 +23,10 @@
             <a href="#listings" class="list-group-item list-group-item-action" data-bs-toggle="tab">
                 <i class="bi bi-list-ul me-2"></i>Moje inzeráty
             </a>
+            <a href="#messages" class="list-group-item list-group-item-action" data-bs-toggle="tab">
+            <i class="bi bi-envelope me-2"></i>Správy
+            <span id="unread-count" class="badge bg-danger rounded-pill ms-1" style="display: none;">0</span>
+            </a>
             <a href="#favorites" class="list-group-item list-group-item-action" data-bs-toggle="tab">
                 <i class="bi bi-heart me-2"></i>Obľúbené
             </a>
@@ -107,7 +111,67 @@
                     <!-- Obľúbené inzeráty sa načítajú cez AJAX -->
                 </div>
             </div>
+            <!-- Messages tab -->
+<div class="tab-pane fade" id="messages">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3><i class="bi bi-envelope me-2"></i>Správy</h3>
+    </div>
 
+    <div id="messages-loading" class="text-center my-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Načítavam...</span>
+        </div>
+        <p class="mt-2">Načítavam správy...</p>
+    </div>
+
+    <div class="row">
+        <!-- Zoznam konverzácií -->
+        <div class="col-md-4">
+            <div class="list-group" id="conversations-list">
+                <!-- Konverzácie sa načítajú cez AJAX -->
+            </div>
+        </div>
+
+        <!-- Obsah konverzácie -->
+        <div class="col-md-8">
+            <div id="conversation-container" style="display: none;">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 id="conversation-title" class="mb-0"></h5>
+                            <small id="conversation-subtitle" class="text-muted"></small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="closeConversation()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;" id="messages-container">
+                        <!-- Správy konverzácie sa načítajú tu -->
+                    </div>
+                    <div class="card-footer">
+                        <form id="message-form" onsubmit="sendMessage(event)">
+                            <div class="input-group">
+                                <input type="hidden" id="conversation-user-id">
+                                <input type="hidden" id="conversation-listing-id">
+                                <textarea id="message-input" class="form-control" rows="2"
+                                          placeholder="Napíšte správu..." required></textarea>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div id="no-conversation-selected" class="text-center py-5">
+                <i class="bi bi-envelope display-4 text-muted mb-3"></i>
+                <h4>Vyberte konverzáciu</h4>
+                <p class="text-muted">Vyberte konverzáciu zo zoznamu vľavo.</p>
+            </div>
+        </div>
+    </div>
+</div>
             <!-- Change password tab -->
             <div class="tab-pane fade" id="change-password">
                 <h3><i class="bi bi-key me-2"></i>Zmena hesla</h3>
@@ -143,7 +207,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
-
+<script src="{{ url_for('static', filename='js/messages.js') }}"></script>
 <style>
 .card {
     transition: transform 0.2s, box-shadow 0.2s;

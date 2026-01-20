@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_user, login_required, logout_user, current_user
 from extensions import db
-from sqlalchemy import or_
+from sqlalchemy import or_, desc
 from models import User, Category, Listing, Image, Message, Favorite
 from forms import RegistrationForm, LoginForm, ListingForm, ChangePasswordForm
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -541,3 +541,209 @@ def register_routes(app):
         db.session.commit()
 
         return jsonify({'success': True, 'message': 'Inzerát bol odstránený'}), 200
+
+    # API endpoint na získanie správ používateľa
+    @app.route('/api/my-messages')
+    @login_required
+    def api_my_messages():
+        # Získať správy kde používateľ je odosielateľ alebo príjemca
+        messages = Message.query.filter(
+            (Message.sender_id == current_user.id) |
+            (Message.receiver_id == current_user.id)
+        ).order_by(desc(Message.created_at)).all()
+
+        messages_data = []
+        for message in messages:
+            messages_data.append({
+                'id': message.id,
+                'content': message.content,
+                'sender_id': message.sender_id,
+                'sender_name': message.sender.username,
+                'receiver_id': message.receiver_id,
+                'receiver_name': message.receiver.username,
+                'listing_id': message.listing_id,
+                'listing_title': message.listing.title if message.listing else None,
+                'created_at': message.created_at.strftime('%d.%m.%Y %H:%M'),
+                'is_read': message.is_read,
+                'is_sender': message.sender_id == current_user.id
+            })
+
+        return jsonify(messages_data)
+
+    # API endpoint na označenie správy ako prečítanej
+    @app.route('/api/messages/<int:message_id>/read', methods=['POST'])
+    @login_required
+    def mark_message_as_read(message_id):
+        message = Message.query.get_or_404(message_id)
+
+        # Kontrola, či používateľ je príjemca správy
+        if message.receiver_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
+
+        try:
+            message.is_read = True
+            db.session.commit()
+            return jsonify({'success': True, 'message': 'Správa označená ako prečítaná'}), 200
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri označovaní správy: {e}")
+            return jsonify({'success': False, 'message': 'Chyba pri označovaní správy'}), 500
+
+    # API endpoint na získanie správ konkrétnej konverzácie
+    @app.route('/api/conversation/<int:other_user_id>')
+    @app.route('/api/conversation/<int:other_user_id>/<int:listing_id>')
+    @login_required
+    def api_conversation(other_user_id, listing_id=None):
+        # Získanie všetkých správ medzi používateľmi
+        query = Message.query.filter(
+            or_(
+                and_(Message.sender_id == current_user.id, Message.receiver_id == other_user_id),
+                and_(Message.sender_id == other_user_id, Message.receiver_id == current_user.id)
+            )
+        )
+
+        if listing_id:
+            query = query.filter_by(listing_id=listing_id)
+        else:
+            query = query.filter(Message.listing_id.is_(None))
+
+        messages = query.order_by(Message.created_at.asc()).all()
+
+        # Označiť správy ako prečítané
+        for msg in messages:
+            if msg.receiver_id == current_user.id and not msg.is_read:
+                msg.is_read = True
+
+        try:
+            db.session.commit()
+        except:
+            db.session.rollback()
+
+        # Získanie informácií o druhom používateľovi
+        other_user = User.query.get(other_user_id)
+        listing = Listing.query.get(listing_id) if listing_id else None
+
+        messages_data = []
+        for message in messages:
+            messages_data.append({
+                'id': message.id,
+                'content': message.content,
+                'sender_id': message.sender_id,
+                'sender_name': message.sender.username,
+                'receiver_id': message.receiver_id,
+                'created_at': message.created_at.strftime('%d.%m.%Y %H:%M'),
+                'is_read': message.is_read,
+                'is_sender': message.sender_id == current_user.id
+            })
+
+        return jsonify({
+            'messages': messages_data,
+            'other_user': {
+                'id': other_user.id,
+                'username': other_user.username
+            },
+            'listing': {
+                'id': listing.id,
+                'title': listing.title
+            } if listing else None
+        })
+
+    # API endpoint na odoslanie správy cez AJAX
+    @app.route('/api/send-message', methods=['POST'])
+    @login_required
+    def api_send_message():
+        data = request.get_json()
+
+        receiver_id = data.get('receiver_id')
+        listing_id = data.get('listing_id')
+        content = data.get('content')
+
+        if not receiver_id or not content:
+            return jsonify({'success': False, 'message': 'Chýbajúce údaje'}), 400
+
+        message = Message(
+            sender_id=current_user.id,
+            receiver_id=receiver_id,
+            listing_id=listing_id,
+            content=content
+        )
+
+        try:
+            db.session.add(message)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Správa bola odoslaná',
+                'message_id': message.id,
+                'created_at': message.created_at.strftime('%d.%m.%Y %H:%M')
+            }), 200
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri odosielaní správy: {e}")
+            return jsonify({'success': False, 'message': 'Chyba pri odosielaní správy'}), 500
+
+    # API endpoint na získanie konverzácií používateľa
+    @app.route('/api/conversations')
+    @login_required
+    def api_conversations():
+        # Získanie unikátnych konverzácií (zoskupené podľa druhého používateľa a inzerátu)
+        subquery = db.session.query(
+            Message.sender_id,
+            Message.receiver_id,
+            Message.listing_id,
+            db.func.max(Message.created_at).label('last_message_time')
+        ).filter(
+            (Message.sender_id == current_user.id) | (Message.receiver_id == current_user.id)
+        ).group_by(
+            db.func.least(Message.sender_id, Message.receiver_id),
+            db.func.greatest(Message.sender_id, Message.receiver_id),
+            Message.listing_id
+        ).subquery()
+
+        # Získanie posledných správ z každej konverzácie
+        latest_messages = db.session.query(Message).join(
+            subquery,
+            and_(
+                Message.sender_id == subquery.c.sender_id,
+                Message.receiver_id == subquery.c.receiver_id,
+                Message.listing_id == subquery.c.listing_id,
+                Message.created_at == subquery.c.last_message_time
+            )
+        ).order_by(desc(Message.created_at)).all()
+
+        conversations = []
+        for msg in latest_messages:
+            # Určiť druhého používateľa v konverzácii
+            other_user = msg.receiver if msg.sender_id == current_user.id else msg.sender
+            listing = msg.listing
+
+            # Počet neprečítaných správ od druhého používateľa
+            unread_count = Message.query.filter(
+                Message.sender_id == other_user.id,
+                Message.receiver_id == current_user.id,
+                Message.listing_id == msg.listing_id,
+                Message.is_read == False
+            ).count()
+
+            conversations.append({
+                'other_user_id': other_user.id,
+                'other_user_name': other_user.username,
+                'listing_id': msg.listing_id,
+                'listing_title': listing.title if listing else None,
+                'last_message': msg.content[:100] + '...' if len(msg.content) > 100 else msg.content,
+                'last_message_time': msg.created_at.strftime('%d.%m.%Y %H:%M'),
+                'is_sender': msg.sender_id == current_user.id,
+                'unread_count': unread_count
+            })
+
+        return jsonify(conversations)
+
+    @app.route('/api/unread-messages-count')
+    @login_required
+    def api_unread_messages_count():
+        count = Message.query.filter(
+            Message.receiver_id == current_user.id,
+            Message.is_read == False
+        ).count()
+
+        return jsonify({'count': count})

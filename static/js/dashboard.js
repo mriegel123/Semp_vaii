@@ -332,7 +332,7 @@ function loadUserFavorites() {
                             <i class="bi bi-heart display-4 mb-3 text-danger"></i>
                             <h4 class="alert-heading">Zatiaľ nemáte žiadne obľúbené inzeráty</h4>
                             <p>Prechádzajte inzeráty a pridávajte si do obľúbených tie, ktoré sa vám páčia!</p>
-                            <a href="{{ url_for('listings') }}" class="btn btn-danger mt-2">
+                            <a href="/listings" class="btn btn-danger mt-2">
                                 <i class="bi bi-search"></i> Prehľadávať inzeráty
                             </a>
                         </div>
@@ -506,7 +506,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const target = this.getAttribute('href').substring(1);
             if (target === 'listings') {
                 loadUserListings();
-            } else if (target === 'favorites') {
+            } else if(target === 'messages'){
+                loaduserConversations();
+
+            }
+            else if (target === 'favorites') {
                 loadUserFavorites();
             } else if (target === 'change-password') {
                 // Vyčistíme formulár a chyby pri prepnutí na tab

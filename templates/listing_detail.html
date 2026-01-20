@@ -16,83 +16,95 @@
     </nav>
 
     <div class="row">
-            <div class="col-lg-8">
-    <div class="card mb-4">
-        {% if listing.images %}
-        <!-- Hlavný carousel -->
-        <div id="listingCarousel" class="carousel slide" data-bs-ride="carousel">
-            <div class="carousel-inner">
-                {% for image in listing.images %}
-                <div class="carousel-item {% if loop.first %}active{% endif %}" data-bs-slide-to="{{ loop.index0 }}">
-                    <img src="{{ url_for('static', filename='uploads/' + image.filename) }}"
-                         class="d-block w-100"
-                         alt="{{ listing.title }} - obrázok {{ loop.index }}"
-                         style="max-height: 500px; object-fit: contain;">
-                </div>
-                {% endfor %}
-            </div>
+        <!-- Hlavný obsah -->
+        <div class="col-lg-8">
+            <!-- Obrázky -->
+            <div class="card mb-4">
+                {% if listing.images %}
+                <!-- Carousel -->
+                <div id="listingCarousel" class="carousel slide" data-bs-ride="carousel">
+                    <div class="carousel-inner">
+                        {% for image in listing.images %}
+                        <div class="carousel-item {% if loop.first %}active{% endif %}" data-bs-slide-to="{{ loop.index0 }}">
+                            <img src="{{ url_for('static', filename='uploads/' + image.filename) }}"
+                                 class="d-block w-100"
+                                 alt="{{ listing.title }} - obrázok {{ loop.index }}"
+                                 style="max-height: 500px; object-fit: contain;">
+                        </div>
+                        {% endfor %}
+                    </div>
 
-            <!-- Navigačné šípky -->
-            {% if listing.images|length > 1 %}
-            <button class="carousel-control-prev" type="button" data-bs-target="#listingCarousel" data-bs-slide="prev">
-                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Predchádzajúci</span>
-            </button>
-            <button class="carousel-control-next" type="button" data-bs-target="#listingCarousel" data-bs-slide="next">
-                <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                <span class="visually-hidden">Ďalší</span>
-            </button>
-
-            <!-- Indikátory (bodky) -->
-            <div class="carousel-indicators">
-                {% for image in listing.images %}
-                <button type="button"
-                        data-bs-target="#listingCarousel"
-                        data-bs-slide-to="{{ loop.index0 }}"
-                        class="{% if loop.first %}active{% endif %}"
-                        aria-label="Obrázok {{ loop.index }}"></button>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- Thumbnail galéria -->
-        {% if listing.images|length > 1 %}
-        <div class="container mt-3">
-            <div class="row g-2 justify-content-center" id="thumbnailGallery">
-                {% for image in listing.images %}
-                <div class="col-auto">
-                    <button type="button"
-                            class="btn btn-outline-secondary p-0 thumbnail-btn {% if loop.first %}active{% endif %}"
-                            data-bs-target="#listingCarousel"
-                            data-bs-slide-to="{{ loop.index0 }}"
-                            aria-label="Obrázok {{ loop.index }}">
-                        <img src="{{ url_for('static', filename='uploads/' + image.filename) }}"
-                             class="img-thumbnail"
-                             alt="Náhľad {{ loop.index }}"
-                             style="width: 80px; height: 80px; object-fit: cover;">
+                    <!-- Navigačné šípky -->
+                    {% if listing.images|length > 1 %}
+                    <button class="carousel-control-prev" type="button" data-bs-target="#listingCarousel" data-bs-slide="prev">
+                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Predchádzajúci</span>
                     </button>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
+                    <button class="carousel-control-next" type="button" data-bs-target="#listingCarousel" data-bs-slide="next">
+                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                        <span class="visually-hidden">Ďalší</span>
+                    </button>
 
-        {% else %}
-        <div class="text-center py-5 bg-light">
-            <i class="bi bi-image display-1 text-muted"></i>
-            <p class="mt-3 text-muted">Žiadne obrázky</p>
-        </div>
-        {% endif %}
-    </div>
-        <h3 class="h4 mb-3">Popis</h3>
-    <div class="bg-light p-3 rounded">
-    {% if listing.description %}
-        <pre style="white-space: pre-wrap; font-family: inherit; margin: 0;">{{ listing.description }}</pre>
-    {% else %}
-        <p class="text-muted mb-0">Tento inzerát nemá popis.</p>
-    {% endif %}
-    </div>
+                    <!-- Indikátory -->
+                    <div class="carousel-indicators">
+                        {% for image in listing.images %}
+                        <button type="button"
+                                data-bs-target="#listingCarousel"
+                                data-bs-slide-to="{{ loop.index0 }}"
+                                class="{% if loop.first %}active{% endif %}"
+                                aria-label="Obrázok {{ loop.index }}"></button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Thumbnail galéria -->
+                {% if listing.images|length > 1 %}
+                <div class="container mt-3">
+                    <div class="row g-2 justify-content-center" id="thumbnailGallery">
+                        {% for image in listing.images %}
+                        <div class="col-auto">
+                            <button type="button"
+                                    class="btn btn-outline-secondary p-0 thumbnail-btn {% if loop.first %}active{% endif %}"
+                                    data-bs-target="#listingCarousel"
+                                    data-bs-slide-to="{{ loop.index0 }}"
+                                    aria-label="Obrázok {{ loop.index }}">
+                                <img src="{{ url_for('static', filename='uploads/' + image.filename) }}"
+                                     class="img-thumbnail"
+                                     alt="Náhľad {{ loop.index }}"
+                                     style="width: 80px; height: 80px; object-fit: cover;">
+                            </button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% else %}
+                <!-- Bez obrázkov -->
+                <div class="text-center py-5 bg-light">
+                    <i class="bi bi-image display-1 text-muted"></i>
+                    <p class="mt-3 text-muted">Žiadne obrázky</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Popis -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="h5 mb-0">Popis</h3>
+                </div>
+                <div class="card-body">
+                    {% if listing.description %}
+                    <div class="listing-description">
+                        {{ listing.description|replace('\n', '<br>')|safe }}
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">Tento inzerát nemá popis.</p>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Kontaktný formulár -->
             {% if current_user.is_authenticated and current_user.id != listing.user_id and listing.status == 'active' %}
             <div class="card">
@@ -112,6 +124,9 @@
                         <button type="submit" class="btn btn-primary">
                             <i class="bi bi-send"></i> Odoslať správu
                         </button>
+                        <small class="d-block text-muted mt-2">
+                            Ďalšie správy môžete posielať v sekcii <a href="{{ url_for('dashboard') }}#messages">Správy</a> vo vašom dashboarde.
+                        </small>
                     </form>
                 </div>
             </div>
@@ -124,56 +139,92 @@
 
         <!-- Sidebar -->
         <div class="col-lg-4">
-            <!-- Cena a akcie -->
+            <!-- Informácie o inzeráte -->
             <div class="card mb-4">
-                <div class="card-body text-center">
-                    <h2 class="display-5 text-primary mb-3">{{ listing.price }} €</h2>
+                <div class="card-body">
+                    <!-- Cena -->
+                    <div class="text-center mb-4">
+                        <h2 class="display-5 text-primary">{{ listing.price }} €</h2>
+                        {% if listing.status == 'sold' %}
+                        <span class="badge bg-danger">Predané</span>
+                        {% elif listing.status == 'expired' %}
+                        <span class="badge bg-warning text-dark">Expirované</span>
+                        {% endif %}
+                    </div>
 
-                    <div class="d-grid gap-2">
-                        {% if current_user.is_authenticated and current_user.id != listing.user_id and listing.status == 'active' %}
-                        <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#contactModal">
-                            <i class="bi bi-envelope"></i> Kontaktovať
-                        </button>
-
-                        <form method="POST" action="{{ url_for('toggle_favorite') }}" class="d-inline">
-                            <input type="hidden" name="listing_id" value="{{ listing.id }}">
-                            <button type="submit" class="btn btn-outline-danger w-100">
-                                {% if listing.id in current_user_favorites %}
-                                <i class="bi bi-heart-fill"></i> Odstrániť z obľúbených
+                    <!-- Detaily -->
+                    <div class="mb-4">
+                        <h5 class="border-bottom pb-2">Detaily</h5>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-geo-alt text-primary me-2"></i>
+                                <strong>Lokalita:</strong> {{ listing.location }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-tag text-primary me-2"></i>
+                                <strong>Kategória:</strong> {{ listing.category.name }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-calendar text-primary me-2"></i>
+                                <strong>Pridané:</strong> {{ listing.created_at.strftime('%d.%m.%Y') }}
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-person text-primary me-2"></i>
+                                <strong>Stav:</strong>
+                                {% if listing.status == 'active' %}
+                                <span class="badge bg-success">Aktívny</span>
+                                {% elif listing.status == 'sold' %}
+                                <span class="badge bg-danger">Predaný</span>
                                 {% else %}
-                                <i class="bi bi-heart"></i> Pridať do obľúbených
+                                <span class="badge bg-warning">Expirovaný</span>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Akcie -->
+                    <div class="d-grid gap-2">
+                        <!-- Obľúbené -->
+                        {% if current_user.is_authenticated %}
+                        <form method="POST" action="{{ url_for('toggle_favorite') }}" class="mb-2">
+                            <input type="hidden" name="listing_id" value="{{ listing.id }}">
+                            <button type="submit" class="btn {% if listing.id in current_user_favorites %}btn-outline-danger{% else %}btn-outline-primary{% endif %} w-100">
+                                <i class="bi bi-heart{% if listing.id in current_user_favorites %}-fill{% endif %} me-1"></i>
+                                {% if listing.id in current_user_favorites %}
+                                Odstrániť z obľúbených
+                                {% else %}
+                                Pridať do obľúbených
                                 {% endif %}
                             </button>
                         </form>
-
-                        {% elif current_user.is_authenticated and current_user.id == listing.user_id %}
-                        <div class="btn-group w-100" role="group">
-                            <a href="{{ url_for('edit_listing', id=listing.id) }}" class="btn btn-warning">
-                                <i class="bi bi-pencil"></i> Upraviť
-                            </a>
-                            <button type="button" class="btn btn-danger" onclick="deleteListing({{ listing.id }})">
-                                <i class="bi bi-trash"></i> Odstrániť
-                            </button>
-                        </div>
-                        {% elif not current_user.is_authenticated %}
-                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-box-arrow-in-right"></i> Prihlásiť sa pre kontakt
-                        </a>
-                        <a href="{{ url_for('register') }}" class="btn btn-success">
-                            <i class="bi bi-person-plus"></i> Registrovať sa
-                        </a>
                         {% endif %}
 
-                        {% if listing.status != 'active' %}
-                        <div class="alert alert-secondary mt-3">
-                            Tento inzerát už nie je aktívny.
+                        <!-- Upraviť/Odstrániť pre vlastníka -->
+                        {% if current_user.is_authenticated and current_user.id == listing.user_id %}
+                        <div class="btn-group w-100" role="group">
+                            <a href="{{ url_for('edit_listing', id=listing.id) }}" class="btn btn-warning">
+                                <i class="bi bi-pencil me-1"></i> Upraviť
+                            </a>
+                            <button type="button" class="btn btn-danger" onclick="deleteListing({{ listing.id }})">
+                                <i class="bi bi-trash me-1"></i> Odstrániť
+                            </button>
                         </div>
+                        {% endif %}
+
+                        <!-- Prihlásenie/Registrácia -->
+                        {% if not current_user.is_authenticated %}
+                        <a href="{{ url_for('login') }}" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Prihlásiť sa
+                        </a>
+                        <a href="{{ url_for('register') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-person-plus me-1"></i> Registrovať sa
+                        </a>
                         {% endif %}
                     </div>
                 </div>
             </div>
 
-            <!-- Informácie o predávajúcom -->
+            <!-- Predávajúci -->
             <div class="card mb-4">
                 <div class="card-header">
                     <h3 class="h5 mb-0">Predávajúci</h3>
@@ -195,17 +246,26 @@
                     <div class="row text-center">
                         <div class="col-6">
                             <div class="border rounded p-2">
-                                <div class="h4 mb-0">{{ listing.author.listings|length }}</div>
+                                <div class="h5 mb-0">{{ listing.author.listings|length }}</div>
                                 <small class="text-muted">Inzerátov</small>
                             </div>
                         </div>
                         <div class="col-6">
                             <div class="border rounded p-2">
-                                <div class="h4 mb-0">{{ listing.author.listings|selectattr('status', 'equalto', 'active')|list|length }}</div>
+                                <div class="h5 mb-0">{{ listing.author.listings|selectattr('status', 'equalto', 'active')|list|length }}</div>
                                 <small class="text-muted">Aktívnych</small>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Kontaktovať tlačidlo -->
+                    {% if current_user.is_authenticated and current_user.id != listing.user_id and listing.status == 'active' %}
+                    <div class="mt-3">
+                        <button class="btn btn-primary w-100" data-bs-toggle="collapse" data-bs-target="#contactForm">
+                            <i class="bi bi-envelope me-1"></i> Napísať správu
+                        </button>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -246,30 +306,6 @@
         </div>
     </div>
 </div>
-
-<!-- Contact Modal -->
-<div class="modal fade" id="contactModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Kontaktovať predávajúceho</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form method="POST" action="{{ url_for('send_message') }}">
-                    <input type="hidden" name="listing_id" value="{{ listing.id }}">
-                    <input type="hidden" name="receiver_id" value="{{ listing.user_id }}">
-
-                    <div class="mb-3">
-                        <label for="modalMessage" class="form-label">Vaša správa</label>
-                        <textarea class="form-control" id="modalMessage" name="content" rows="4" required></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Odoslať správu</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -290,13 +326,33 @@ function deleteListing(listingId) {
             } else {
                 alert('Chyba pri odstraňovaní: ' + data.message);
             }
+        })
+        .catch(error => {
+            console.error('Chyba:', error);
+            alert('Chyba pri odstraňovaní inzerátu');
         });
     }
 }
 
-// Inicializácia carousel
+// Inicializácia carousel a thumbnail interakcie
 document.addEventListener('DOMContentLoaded', function() {
-    var carousel = new bootstrap.Carousel(document.getElementById('listingCarousel'));
+    // Inicializácia carousel
+    var carousel = document.getElementById('listingCarousel');
+    if (carousel) {
+        var bsCarousel = new bootstrap.Carousel(carousel);
+    }
+
+    // Interakcia thumbnailov
+    document.querySelectorAll('.thumbnail-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Odstrániť active class zo všetkých
+            document.querySelectorAll('.thumbnail-btn').forEach(b => {
+                b.classList.remove('active');
+            });
+            // Pridať active class kliknutému
+            this.classList.add('active');
+        });
+    });
 });
 </script>
 
@@ -306,19 +362,54 @@ document.addEventListener('DOMContentLoaded', function() {
     white-space: pre-line;
 }
 
-.listing-description br {
-    margin-bottom: 1rem;
-    display: block;
-    content: "";
-}
-
 .card {
     border: 1px solid #e0e0e0;
     transition: box-shadow 0.2s;
+    border-radius: 10px;
 }
 
 .card:hover {
     box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.carousel-item img {
+    border-radius: 10px 10px 0 0;
+}
+
+.thumbnail-btn {
+    border: 2px solid transparent;
+    border-radius: 5px;
+    transition: all 0.2s;
+}
+
+.thumbnail-btn.active {
+    border-color: #0d6efd;
+}
+
+.thumbnail-btn:hover:not(.active) {
+    border-color: #dee2e6;
+}
+
+.thumbnail-btn img {
+    border-radius: 3px;
+}
+
+.badge {
+    font-size: 0.9em;
+    padding: 0.5em 0.8em;
+}
+
+.btn-group .btn {
+    border-radius: 5px;
+}
+
+.list-unstyled li {
+    padding: 5px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.list-unstyled li:last-child {
+    border-bottom: none;
 }
 </style>
 {% endblock %}
