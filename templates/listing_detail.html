@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 
 {% block title %}{{ listing.title }} - Trhovisko{% endblock %}
-
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/listing_detail.css') }}">
+{% endblock %}
 {% block content %}
 <div class="container">
     <!-- Breadcrumb -->
@@ -301,107 +304,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-function deleteListing(listingId) {
-    if (confirm('Naozaj chcete odstrániť tento inzerát?')) {
-        fetch(`/listings/${listingId}/delete`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Inzerát bol odstránený');
-                window.location.href = '{{ url_for("dashboard") }}';
-            } else {
-                alert('Chyba pri odstraňovaní: ' + data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Chyba:', error);
-            alert('Chyba pri odstraňovaní inzerátu');
-        });
-    }
-}
-
-// Inicializácia carousel a thumbnail interakcie
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializácia carousel
-    var carousel = document.getElementById('listingCarousel');
-    if (carousel) {
-        var bsCarousel = new bootstrap.Carousel(carousel);
-    }
-
-    // Interakcia thumbnailov
-    document.querySelectorAll('.thumbnail-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            // Odstrániť active class zo všetkých
-            document.querySelectorAll('.thumbnail-btn').forEach(b => {
-                b.classList.remove('active');
-            });
-            // Pridať active class kliknutému
-            this.classList.add('active');
-        });
-    });
-});
-</script>
-
-<style>
-.listing-description {
-    line-height: 1.6;
-    white-space: pre-line;
-}
-
-.card {
-    border: 1px solid #e0e0e0;
-    transition: box-shadow 0.2s;
-    border-radius: 10px;
-}
-
-.card:hover {
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-.carousel-item img {
-    border-radius: 10px 10px 0 0;
-}
-
-.thumbnail-btn {
-    border: 2px solid transparent;
-    border-radius: 5px;
-    transition: all 0.2s;
-}
-
-.thumbnail-btn.active {
-    border-color: #0d6efd;
-}
-
-.thumbnail-btn:hover:not(.active) {
-    border-color: #dee2e6;
-}
-
-.thumbnail-btn img {
-    border-radius: 3px;
-}
-
-.badge {
-    font-size: 0.9em;
-    padding: 0.5em 0.8em;
-}
-
-.btn-group .btn {
-    border-radius: 5px;
-}
-
-.list-unstyled li {
-    padding: 5px 0;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.list-unstyled li:last-child {
-    border-bottom: none;
-}
-</style>
+{{ super() }}
+<script src="{{ url_for('static', filename='js/listing_detail.js') }}"></script>
 {% endblock %}

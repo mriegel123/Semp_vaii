@@ -343,9 +343,6 @@ pip install -r requirements.txt
 # 3) Inicializovať databázu (ak ešte neexistuje)
 python -c "from app import create_app; from extensions import db; app = create_app(); app.app_context().push(); db.create_all()"
 
-# 4) (Voliteľné) seed dát
-python .\seed.py
-
 # 5) Spustiť aplikáciu
 python .\run.py
 ```

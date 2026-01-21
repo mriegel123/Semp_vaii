@@ -8,7 +8,7 @@ def create_app():
     app = Flask(__name__)
 
     # Konfigurácia
-    app.config['SECRET_KEY'] = 'tvoje_tajne_heslo_ktore_si_zmenis'
+    app.config['SECRET_KEY'] = 'heslo, ktore sa potom ma zmenit na nieco bezpecnejsie'
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///data.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
