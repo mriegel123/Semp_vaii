@@ -3,12 +3,16 @@
 ## Obsah
 1. [Prehľad aplikácie](#prehľad-aplikácie)
 2. [Architektúra projektu](#architektúra-projektu)
-3. [Databázové modely](#databázové-modely)
-4. [Routes (Endpoints)](#routes-endpoints)
-5. [Formuláre](#formuláre)
-6. [Frontend štruktúra](#frontend-štruktúra)
-7. [Autentifikácia a autorizácia](#autentifikácia-a-autorizácia)
-8. [Spustenie aplikácie](#spustenie-aplikácie)
+3. [Ako Flask funguje v tejto aplikácii](#ako-flask-funguje-v-tejto-aplikácii)
+4. [Databázové modely](#databázové-modely)
+5. [Routes (Endpoints)](#routes-endpoints)
+6. [Admin panel](#admin-panel)
+7. [AJAX a klientská logika](#ajax-a-klientská-logika)
+8. [Formuláre](#formuláre)
+9. [Frontend štruktúra](#frontend-štruktúra)
+10. [Autentifikácia a autorizácia](#autentifikácia-a-autorizácia)
+11. [Spustenie aplikácie (konzola)](#spustenie-aplikácie-konzola)
+12. [Bezpečnosť](#bezpečnosť)
 
 ---
 
@@ -39,39 +43,42 @@
 
 ```
 FlaskProject1/
-├── app.py              # Inicializácia Flask aplikácie
-├── run.py              # Vstupný bod aplikácie
-├── routes.py           # Všetky route handlery
+├── app.py              # Inicializácia Flask aplikácie (factory + registrácia routes)
+├── run.py              # Alternatívny vstupný bod aplikácie
+├── routes.py           # Všetky route handlery (UI + API)
 ├── models.py           # Databázové modely
 ├── forms.py            # WTForms formuláre
-├── extensions.py       # Flask rozšírenia (db)
-├── seed.py             # Seed dáta pre databázu
+├── extensions.py       # Flask rozšírenia (db, login_manager)
 ├── requirements.txt    # Python závislosti
-├── docker-compose.yml  # Docker konfigurácia
 ├── instance/
 │   └── data.db         # SQLite databáza
 ├── static/
 │   ├── css/
 │   │   └── main.css    # Vlastné štýly
 │   ├── js/
-│   │   ├── dashboard.js      # Dashboard logika
-│   │   ├── messages.js       # Správy (AJAX)
-│   │   ├── favourites.js     # Obľúbené
-│   │   ├── listing_detail.js # Detail inzerátu
-│   │   ├── edit_listing.js   # Úprava inzerátu
-│   │   ├── search.js         # Rýchle vyhľadávanie
+│   │   ├── dashboard.js      # Dashboard logika (AJAX pre moje inzeráty, zmenu hesla)
+│   │   ├── messages.js       # Správy (konverzácie, odosielanie, počty)
+│   │   ├── favourites.js     # Obľúbené (toggle cez AJAX)
+│   │   ├── listing_detail.js # Detail inzerátu (mazanie, galéria)
 │   │   └── main.js           # Hlavný JS
 │   └── uploads/              # Nahrané obrázky
 └── templates/
-    ├── base.html             # Základná šablóna
-    ├── index.html            # Domovská stránka
-    ├── login.html            # Prihlásenie
-    ├── register.html         # Registrácia
-    ├── dashboard.html        # Používateľský dashboard
-    ├── listings.html         # Zoznam inzerátov
-    ├── listing_detail.html   # Detail inzerátu
-    ├── new_listing.html      # Nový inzerát
-    └── edit_listing.html     # Úprava inzerátu
+    ├── base.html                     # Základná šablóna
+    ├── index.html                    # Domovská stránka
+    ├── login.html                    # Prihlásenie
+    ├── register.html                 # Registrácia
+    ├── dashboard.html                # Používateľský dashboard
+    ├── listings.html                 # Zoznam inzerátov
+    ├── listing_detail.html           # Detail inzerátu
+    ├── new_listing.html              # Nový inzerát
+    ├── edit_listing.html             # Úprava inzerátu
+    └── admin/
+        ├── base_admin.html           # Admin layout (bočné menu)
+        ├── dashboard.html            # Admin dashboard so štatistikami
+        ├── users.html                # Správa používateľov (mazanie, roly)
+        ├── listings.html             # Správa inzerátov (mazanie)
+        ├── messages.html             # Správa správ (mazanie)
+        └── categories.html           # Správa kategórií (pridanie/mazanie)
 ```
 
 ### Tok dát v aplikácii
@@ -80,11 +87,26 @@ FlaskProject1/
 [Prehliadač] <--> [Flask Routes] <--> [SQLAlchemy Models] <--> [SQLite DB]
       |                 |
       |                 v
-      |         [Jinja2 Templates]
+      |           [Jinja2 Templates]
       |                 |
       v                 v
 [JavaScript] <--> [JSON API Responses]
 ```
+
+---
+
+## Ako funguje Flask v tejto aplikácii
+
+- Aplikácia sa skladá z inicializačného súboru `app.py` (factory `create_app()`), kde sa:
+  - vytvorí `Flask` inštancia,
+  - nainicializujú rozšírenia v `extensions.py` (`db = SQLAlchemy()`, `login_manager = LoginManager()`),
+  - nakonfiguruje `SECRET_KEY` a `SQLALCHEMY_DATABASE_URI`,
+  - zaregistrujú všetky routes cez `register_routes(app)` z `routes.py`.
+- `run.py` obsahuje alternatívnu (samostatnú) spustiteľnú aplikáciu s definíciami modelov a routes inline. V bežnom nasadení odporúčame `app.py + routes.py` (čistejšie oddelenie vrstiev).
+- `login_manager.user_loader` načítava používateľa z DB podľa ID; `login_manager.login_view = 'login'` zabezpečí presmerovanie neprihlásených používateľov.
+- `@app.context_processor` sprístupňuje `current_user` vo všetkých šablónach.
+- Šablóny sú renderované pomocou `render_template(...)` a komunikácia s DB prebieha cez SQLAlchemy ORM (`db.session`).
+- API endpoints vracajú JSON pomocou `jsonify(...)` a sú volané z JavaScriptu (fetch API).
 
 ---
 
@@ -100,11 +122,11 @@ class User(db.Model, UserMixin):
     role            # String(20), default='user'
     created_at      # DateTime, automaticky nastavené
     
-    # Vzťahy:
-    listings            # Inzeráty používateľa
-    sent_messages       # Odoslané správy
-    received_messages   # Prijaté správy
-    favorites           # Obľúbené inzeráty
+    # Vzťahy (kaskádové mazanie je povolené):
+    listings            # Inzeráty používateľa (cascade)
+    sent_messages       # Odoslané správy (cascade)
+    received_messages   # Prijaté správy (cascade)
+    favorites           # Obľúbené inzeráty (cascade)
 ```
 
 ### Category (Kategória)
@@ -169,44 +191,6 @@ class Favorite(db.Model):
     created_at  # DateTime
 ```
 
-### ER Diagram
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   User      │────<│   Listing   │>────│  Category   │
-│             │     │             │     │             │
-│ id          │     │ id          │     │ id          │
-│ username    │     │ title       │     │ name        │
-│ email       │     │ description │     │ description │
-│ password    │     │ price       │     │ parent_id   │
-│ role        │     │ location    │     └─────────────┘
-│ created_at  │     │ status      │           │
-└─────────────┘     │ created_at  │           │
-      │             └─────────────┘           │
-      │                   │                   │
-      │                   │                   │
-      v                   v                   v
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  Message    │     │   Image     │     │ Category    │
-│             │     │             │     │ (child)     │
-│ id          │     │ id          │     └─────────────┘
-│ content     │     │ filename    │
-│ sender_id   │     │ listing_id  │
-│ receiver_id │     │ is_primary  │
-│ listing_id  │     └─────────────┘
-│ is_read     │
-│ created_at  │
-└─────────────┘
-
-┌─────────────┐
-│  Favorite   │
-│             │
-│ id          │
-│ user_id     │
-│ listing_id  │
-│ created_at  │
-└─────────────┘
-```
-
 ---
 
 ## Routes (Endpoints)
@@ -223,582 +207,169 @@ class Favorite(db.Model):
 
 ---
 
-### Autentifikačné routes
-
-#### `GET/POST /register`
-**Funkcia:** `register()`
-
-Registrácia nového používateľa.
-
-**Proces:**
-1. Ak je používateľ prihlásený → presmerovanie na `/`
-2. Validácia formulára (username, email, password)
-3. Vytvorenie User objektu s hashovaným heslom
-4. Uloženie do databázy
-5. Flash správa o úspechu
-6. Presmerovanie na `/login`
-
-**Validácie:**
-- Username: 2-20 znakov, unikátne
-- Email: validný formát, unikátne
-- Password: min. 6 znakov, potvrdenie
-
----
-
-#### `GET/POST /login`
-**Funkcia:** `login()`
-
-Prihlásenie existujúceho používateľa.
-
-**Proces:**
-1. Ak je používateľ prihlásený → presmerovanie na `/`
-2. Vyhľadanie používateľa podľa emailu
-3. Overenie hesla pomocou `check_password()`
-4. Vytvorenie session cez `login_user()`
-5. Presmerovanie na `next` parameter alebo `/`
-
----
-
-#### `GET /logout`
-**Funkcia:** `logout()`
-
-Odhlásenie používateľa.
-
-**Vyžaduje:** Prihlásenie (`@login_required`)
-
-**Proces:**
-1. Zrušenie session cez `logout_user()`
-2. Flash správa
-3. Presmerovanie na `/`
-
----
-
 ### Dashboard routes
 
-#### `GET /dashboard`
-**Funkcia:** `dashboard()`
-
-Používateľský dashboard s tabami.
-
-**Vyžaduje:** Prihlásenie
-
-**Obsah:**
-- Profil používateľa
-- Moje inzeráty
-- Správy
-- Obľúbené
-- Zmena hesla
+| Route | Metódy | Vyžaduje | Popis |
+|-------|--------|----------|-------|
+| `/dashboard` | GET | login | Používateľský dashboard s tabmi |
+| `/listings/new` | GET, POST | login | Vytvorenie nového inzerátu |
+| `/listings/<id>/edit` | GET, POST | login + vlastník | Úprava inzerátu |
+| `/listings/<id>/delete` | POST | login + vlastník | Zmazanie inzerátu (JSON odpoveď) |
 
 ---
 
-### Inzerátové routes
+### API routes (výber)
 
-#### `GET/POST /listings/new`
-**Funkcia:** `new_listing()`
+- Správy (messages):
+  - `GET /api/my-messages` – všetky správy používateľa (chronologicky)
+  - `GET /api/conversations` – zoznam konverzácií (posledná správa, počet neprečítaných)
+  - `GET /api/conversation/<other_user_id>` – správy s používateľom (bez inzerátu)
+  - `GET /api/conversation/<other_user_id>/<listing_id>` – správy k inzerátu
+  - `POST /api/send-message` – odoslanie správy (JSON)
+  - `POST /api/messages/<message_id>/read` – označenie správy ako prečítanej
+  - `GET /api/unread-messages-count` – počet neprečítaných správ
 
-Vytvorenie nového inzerátu.
+- Obľúbené (favorites):
+  - `POST /toggle-favorite` – toggle obľúbeného; vie vrátiť JSON (AJAX) alebo redirect (form)
+  - `POST /api/favorite/<listing_id>` – čisté JSON API na toggle (použité v niektorých častiach)
+  - `GET /api/check-favorite/<listing_id>` – kontrola stavu obľúbenia
+  - `GET /api/my-favorites` – zoznam obľúbených inzerátov
 
-**Vyžaduje:** Prihlásenie
-
-**Proces:**
-1. Načítanie kategórií pre select
-2. Validácia formulára
-3. Vytvorenie Listing objektu
-4. Spracovanie nahraných obrázkov:
-   - Kontrola povolených formátov (jpg, jpeg, png, gif)
-   - Generovanie unikátneho názvu súboru
-   - Uloženie do `static/uploads/`
-   - Vytvorenie Image záznamu
-5. Flash správa a presmerovanie na dashboard
-
----
-
-#### `GET/POST /listings/<id>/edit`
-**Funkcia:** `edit_listing(id)`
-
-Úprava existujúceho inzerátu.
-
-**Vyžaduje:** Prihlásenie, vlastníctvo inzerátu
-
-**Proces:**
-1. Načítanie inzerátu
-2. Kontrola vlastníctva (`listing.user_id == current_user.id`)
-3. Pre GET: naplnenie formulára existujúcimi dátami
-4. Pre POST: aktualizácia dát a spracovanie nových obrázkov
+- Moje inzeráty a profil:
+  - `GET /api/my-listings` – inzeráty prihláseného používateľa
+  - `POST /api/validate-password` – validácia aktuálneho hesla (AJAX)
+  - `POST /api/change-password` – zmena hesla (AJAX)
 
 ---
 
-#### `GET /listings`
-**Funkcia:** `listings()`
+## Admin panel
 
-Zoznam inzerátov s filtrovaním a stránkovaním.
+Admin panel je dostupný len pre používateľov s rolou `admin`.
 
-**Query parametre:**
-| Parameter | Typ | Popis |
-|-----------|-----|-------|
-| `q` | string | Fulltext vyhľadávanie (title, description) |
-| `category` | int | ID kategórie |
-| `min_price` | float | Minimálna cena |
-| `max_price` | float | Maximálna cena |
-| `location` | string | Lokalita (ILIKE) |
-| `page` | int | Číslo stránky (default 1) |
+- Navigácia: odkaz „Admin“ sa zobrazuje v `base.html` iba ak `current_user.is_admin()`.
+- Layout: `templates/admin/base_admin.html` – bočné menu (Dashboard, Používatelia, Inzeráty, Správy, Kategórie).
+- Šablóny: `templates/admin/*.html` (users, listings, messages, categories, dashboard).
 
-**Stránkovanie:** 12 inzerátov na stránku
+### Admin routes
 
----
+| Route | Metódy | Popis |
+|-------|--------|-------|
+| `/admin` | GET | Prehľad štatistík (používatelia, inzeráty, správy, kategórie) |
+| `/admin/users` | GET | Zoznam používateľov |
+| `/admin/users/<user_id>/delete` | POST | Zmazanie používateľa (vrátane všetkých jeho dát) |
+| `/admin/users/<user_id>/toggle-role` | POST | Zmena role user/admin |
+| `/admin/listings` | GET | Zoznam inzerátov |
+| `/admin/listings/<listing_id>/delete` | POST | Zmazanie inzerátu |
+| `/admin/messages` | GET | Zoznam správ |
+| `/admin/messages/<message_id>/delete` | POST | Zmazanie správy |
+| `/admin/categories` | GET | Správa kategórií |
+| `/admin/categories/add` | POST | Pridanie kategórie |
+| `/admin/categories/<category_id>/delete` | POST | Zmazanie kategórie (ak nemá inzeráty) |
 
-#### `POST /listings/<id>/delete`
-**Funkcia:** `delete_listing(id)`
+### Kaskádové mazanie pri zmazaní používateľa
 
-Zmazanie inzerátu.
-
-**Vyžaduje:** Prihlásenie, vlastníctvo
-
-**Odpoveď:** JSON `{success: true/false, message: string}`
-
----
-
-#### `DELETE /listings/<listing_id>/images/<image_id>/delete`
-**Funkcia:** `delete_image(listing_id, image_id)`
-
-Zmazanie obrázka z inzerátu.
-
-**Vyžaduje:** Prihlásenie, vlastníctvo inzerátu
-
-**Proces:**
-1. Kontrola vlastníctva
-2. Kontrola príslušnosti obrázka k inzerátu
-3. Zmazanie súboru z disku
-4. Zmazanie záznamu z databázy
+- V `models.py` sú vzťahy na `User` nastavené s `cascade='all, delete-orphan'` (listings, sent_messages, received_messages, favorites).
+- Pri zmazaní používateľa sa automaticky zmažú všetky jeho inzeráty, správy a obľúbené položky (SQLAlchemy vyrieši poradie).
+- Bezpečnostné obmedzenia:
+  - Nemožno zmazať seba samého (`admin_delete_user` kontroluje `user.id == current_user.id`).
+  - Toggle role samému sebe je zakázaný.
 
 ---
 
-### API routes pre správy
+## AJAX a klientská logika
 
-#### `GET /api/my-messages`
-**Funkcia:** `api_my_messages()`
+### Správy (static/js/messages.js)
+- `loadConversations()` volá `GET /api/conversations` a vykreslí zoznam konverzácií (posledná správa, počet neprečítaných).
+- `openConversation(otherUserId, listingId)` načíta správy cez `GET /api/conversation/...`, nastaví skryté polia pre odpoveď a označí prijaté správy za prečítané.
+- `sendMessage(event)` posiela nové správy cez `POST /api/send-message` s JSON telom; po úspechu obnoví aktuálnu konverzáciu.
+- `updateUnreadCount()` periodicky (30 s) volá `GET /api/unread-messages-count` a aktualizuje badge v UI.
+- Integrované s Bootstrap tabs: pri zobrazení tabu „Správy“ sa konverzácie načítajú (event `shown.bs.tab`).
 
-Získanie všetkých správ používateľa.
+### Obľúbené (static/js/favourites.js)
+- `initializeFavoriteButtons()` zavesí click handler na tlačidlá s triedou `.favorite-btn`.
+- `toggleFavorite(listingId, el)` posiela `FormData` na `POST /toggle-favorite`:
+  - Server rozlíši AJAX (odpovie JSON) vs. klasický formulár (redirect). V AJAX režime sa tlačidlo a badge okamžite aktualizujú.
+- Prehľad obľúbených využíva `GET /api/my-favorites`.
 
-**Odpoveď:**
-```json
-[
-  {
-    "id": 1,
-    "content": "Obsah správy",
-    "sender_id": 1,
-    "sender_name": "username",
-    "receiver_id": 2,
-    "receiver_name": "username2",
-    "listing_id": 5,
-    "listing_title": "Názov inzerátu",
-    "created_at": "20.01.2026 14:30",
-    "is_read": false,
-    "is_sender": true
-  }
-]
-```
+### Moje inzeráty a zmena hesla (static/js/dashboard.js)
+- `loadMyListings()` načíta `GET /api/my-listings` a vykreslí tabuľku kariet.
+- `changePassword()` posiela `POST /api/change-password` s JSON – UI zobrazí úspech/chybu bez reloadu.
 
----
-
-#### `GET /api/conversations`
-**Funkcia:** `api_conversations()`
-
-Získanie zoznamu konverzácií (zoskupené podľa používateľa a inzerátu).
-
-**Logika:**
-1. Načítanie všetkých správ používateľa (ako odosielateľ alebo príjemca)
-2. Zoskupenie podľa `(other_user_id, listing_id)`
-3. Pre každú konverzáciu: posledná správa a počet neprečítaných
-
-**Odpoveď:**
-```json
-[
-  {
-    "other_user_id": 2,
-    "other_user_name": "username",
-    "listing_id": 5,
-    "listing_title": "Názov inzerátu",
-    "last_message": "Posledná správa...",
-    "last_message_time": "20.01.2026 14:30",
-    "is_sender": false,
-    "unread_count": 3
-  }
-]
-```
-
----
-
-#### `GET /api/conversation/<other_user_id>` 
-#### `GET /api/conversation/<other_user_id>/<listing_id>`
-**Funkcia:** `api_conversation(other_user_id, listing_id=None)`
-
-Získanie správ konkrétnej konverzácie.
-
-**Proces:**
-1. Filtrovanie správ medzi aktuálnym a druhým používateľom
-2. Voliteľne filtrovanie podľa `listing_id`
-3. Označenie správ ako prečítané
-4. Zoradenie chronologicky
-
----
-
-#### `POST /api/send-message`
-**Funkcia:** `api_send_message()`
-
-Odoslanie správy cez AJAX.
-
-**Request body:**
-```json
-{
-  "receiver_id": 2,
-  "listing_id": 5,
-  "content": "Text správy"
-}
-```
-
----
-
-#### `POST /api/messages/<message_id>/read`
-**Funkcia:** `mark_message_as_read(message_id)`
-
-Označenie správy ako prečítanej.
-
----
-
-#### `GET /api/unread-messages-count`
-**Funkcia:** `api_unread_messages_count()`
-
-Počet neprečítaných správ pre notifikačný badge.
-
-**Odpoveď:**
-```json
-{"count": 5}
-```
-
----
-
-### API routes pre obľúbené
-
-#### `POST /api/favorite/<listing_id>`
-**Funkcia:** `api_favorite(listing_id)`
-
-Toggle obľúbeného inzerátu (pridanie/odobratie).
-
-**Odpoveď:**
-```json
-{
-  "success": true,
-  "message": "Inzerát bol pridaný do obľúbených.",
-  "favorited": true
-}
-```
-
----
-
-#### `GET /api/check-favorite/<listing_id>`
-**Funkcia:** `check_favorite(listing_id)`
-
-Kontrola, či je inzerát v obľúbených.
-
-**Odpoveď:**
-```json
-{"is_favorite": true}
-```
-
----
-
-#### `GET /api/my-favorites`
-**Funkcia:** `api_my_favorites()`
-
-Zoznam obľúbených inzerátov používateľa.
-
----
-
-### API routes pre inzeráty
-
-#### `GET /api/my-listings`
-**Funkcia:** `api_my_listings()`
-
-Zoznam inzerátov aktuálneho používateľa.
-
-**Odpoveď:**
-```json
-[
-  {
-    "id": 1,
-    "title": "Názov",
-    "description": "Popis",
-    "price": 150.0,
-    "location": "Bratislava",
-    "status": "active",
-    "created_at": "20.01.2026",
-    "category_name": "Elektronika",
-    "image_url": "/static/uploads/image.jpg",
-    "has_images": true
-  }
-]
-```
-
----
-
-### API routes pre zmenu hesla
-
-#### `POST /api/validate-password`
-**Funkcia:** `api_validate_password()`
-
-Overenie aktuálneho hesla (pre real-time validáciu).
-
-**Request body:**
-```json
-{"current_password": "heslo123"}
-```
-
----
-
-#### `POST /api/change-password`
-**Funkcia:** `api_change_password()`
-
-Zmena hesla cez AJAX.
-
-**Request body:**
-```json
-{
-  "current_password": "stare_heslo",
-  "new_password": "nove_heslo"
-}
-```
+### Typické JSON odpovede
+- Úspech: `{ "success": true, "message": "..." }`
+- Chyba validácie: HTTP 400/401 + `{ "success": false, "message": "..." }`
+- Zoznamy: polia objektov (napr. správy, inzeráty)
 
 ---
 
 ## Formuláre
 
-### RegistrationForm
-```python
-class RegistrationForm(FlaskForm):
-    username = StringField('Používateľské meno', 
-        validators=[DataRequired(), Length(min=2, max=20)])
-    email = StringField('Email', 
-        validators=[DataRequired(), Email()])
-    password = PasswordField('Heslo', 
-        validators=[DataRequired(), Length(min=6)])
-    confirm_password = PasswordField('Potvrďte heslo', 
-        validators=[DataRequired(), EqualTo('password')])
-```
-
-### LoginForm
-```python
-class LoginForm(FlaskForm):
-    email = StringField('Email', 
-        validators=[DataRequired(), Email()])
-    password = PasswordField('Heslo', 
-        validators=[DataRequired()])
-```
-
-### ListingForm
-```python
-class ListingForm(FlaskForm):
-    title = StringField('Názov', 
-        validators=[DataRequired(), Length(max=200)])
-    description = TextAreaField('Popis', 
-        validators=[DataRequired()])
-    price = DecimalField('Cena (€)', 
-        validators=[DataRequired(), NumberRange(min=0)])
-    location = StringField('Lokalita', 
-        validators=[DataRequired(), Length(max=200)])
-    category_id = SelectField('Kategória', 
-        coerce=int, validators=[DataRequired()])
-    images = MultipleFileField('Obrázky')
-```
+- `RegistrationForm`, `LoginForm`, `ListingForm`, `ChangePasswordForm` (viď `forms.py`): server-side validácie, CSRF token cez Flask-WTF.
+- Niektoré akcie majú dve formy použitia:
+  - Klasický POST formulár (redirect + flash správy),
+  - AJAX (JSON odpoveď) – bez reloadu stránky.
 
 ---
 
 ## Frontend štruktúra
 
-### JavaScript moduly
-
-#### `messages.js`
-Správa konverzácií a správ.
-
-**Hlavné funkcie:**
-- `loadConversations()` - Načítanie zoznamu konverzácií
-- `openConversation(otherUserId, listingId)` - Otvorenie konverzácie
-- `renderMessages(messages)` - Vykreslenie správ
-- `sendMessage(event)` - Odoslanie správy
-- `updateUnreadCount()` - Aktualizácia počtu neprečítaných
-
-**Event listeners:**
-- `shown.bs.tab` na tab "Správy" - načítanie konverzácií
-- Auto-refresh každých 30 sekúnd
-
----
-
-#### `dashboard.js`
-Logika pre dashboard.
-
-**Hlavné funkcie:**
-- `loadMyListings()` - Načítanie inzerátov používateľa
-- `deleteListing(id)` - Zmazanie inzerátu
-- `changeListingStatus(id, status)` - Zmena statusu
-- `changePassword()` - Zmena hesla
-
----
-
-#### `favourites.js`
-Správa obľúbených inzerátov.
-
-**Hlavné funkcie:**
-- `loadFavorites()` - Načítanie obľúbených
-- `toggleFavorite(listingId)` - Toggle obľúbeného
-- `removeFavorite(listingId)` - Odstránenie z obľúbených
-
----
-
-#### `search.js`
-Rýchle vyhľadávanie na domovskej stránke.
-
-**Hlavné funkcie:**
-- Debounced input handler (300ms)
-- Fetch na `/api/search`
-- Renderovanie výsledkov do `#search-results`
-
----
-
-### Šablóny (Templates)
-
-#### `base.html`
-Základná šablóna s:
-- Bootstrap 5 CDN
-- Navigačný bar
-- Flash messages
-- Footer
-- Bloky: `title`, `head`, `content`, `scripts`
-
-#### `index.html`
-- Rýchle vyhľadávanie
-- Štatistiky
-- Grid 6 najnovších inzerátov
-- Prehľad kategórií
-
-#### `dashboard.html`
-Bootstrap tabs:
-- Profil
-- Moje inzeráty (AJAX)
-- Správy (AJAX)
-- Obľúbené (AJAX)
-- Zmena hesla
-
-#### `listings.html`
-- Sidebar s filtrami
-- Grid inzerátov
-- Stránkovanie
+- Bootstrap 5 (CDN) + Bootstrap Icons (pre admin panel a UI ikony).
+- `base.html` obsahuje navigáciu, flash messages, a bloky `content`/`scripts`.
+- Šablóny používajú Jinja2 (podmienené bloky podľa `current_user`, slučky, filter formátovania dátumu, atď.).
 
 ---
 
 ## Autentifikácia a autorizácia
 
-### Flask-Login konfigurácia
-
-```python
-# app.py
-login_manager = LoginManager()
-login_manager.login_view = 'login'
-login_manager.login_message = 'Pre prístup sa musíte prihlásiť.'
-login_manager.login_message_category = 'info'
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
-```
-
-### Ochrana routes
-
-```python
-@app.route('/dashboard')
-@login_required  # Dekorátor vyžaduje prihlásenie
-def dashboard():
-    ...
-```
-
-### Kontrola vlastníctva
-
-```python
-if listing.user_id != current_user.id:
-    return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
-```
-
-### Hashovanie hesiel
-
-```python
-# Nastavenie hesla
-def set_password(self, password):
-    self.password_hash = generate_password_hash(password)
-
-# Overenie hesla
-def check_password(self, password):
-    return check_password_hash(self.password_hash, password)
-```
+- Flask-Login: `login_manager.login_view = 'login'` a `@login_required` chránia routes.
+- Kontrola vlastníctva pred úpravami/mazaním inzerátov.
+- Admin-only dekorátor (`admin_required`) guarduje admin sekciu.
+- Heslá sú hashované (Werkzeug `generate_password_hash`).
 
 ---
 
-## Spustenie aplikácie
+## Spustenie aplikácie (konzola)
 
-### Lokálne spustenie
+- Predpoklad: Python 3.11+ a `pip`.
 
-```bash
-# 1. Vytvorenie virtuálneho prostredia
+```powershell
+# 1) Vytvoriť a aktivovať virtuálne prostredie (Windows PowerShell)
 python -m venv .venv
-.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # Linux/Mac
+.\.venv\Scripts\Activate.ps1
 
-# 2. Inštalácia závislostí
+# 2) Nainštalovať závislosti
 pip install -r requirements.txt
 
-# 3. Inicializácia databázy (ak neexistuje)
+# 3) Inicializovať databázu (ak ešte neexistuje)
 python -c "from app import create_app; from extensions import db; app = create_app(); app.app_context().push(); db.create_all()"
 
-# 4. Seed dát (voliteľné)
-python seed.py
+# 4) (Voliteľné) seed dát
+python .\seed.py
 
-# 5. Spustenie
-python run.py
+# 5) Spustiť aplikáciu
+python .\run.py
 ```
 
-### Docker spustenie
-
-```bash
-docker-compose up --build
-```
-
-### Premenné prostredia
-
-| Premenná | Popis | Default |
-|----------|-------|---------|
-| `SECRET_KEY` | Tajný kľúč pre sessions | Hardcoded (zmeniť v produkcii!) |
-| `DATABASE_URL` | URL databázy | `sqlite:///instance/data.db` |
+- Aplikácia beží na `http://127.0.0.1:5000/` (ak nie je v kóde nastavené inak).
 
 ---
 
 ## Bezpečnosť
 
 ### Implementované opatrenia
-
-1. **CSRF ochrana** - Flask-WTF automaticky
-2. **Password hashing** - Werkzeug `generate_password_hash`
-3. **SQL Injection ochrana** - SQLAlchemy ORM
-4. **XSS ochrana** - Jinja2 auto-escaping
-5. **File upload validácia** - Kontrola prípony súborov
-6. **Autorizácia** - Kontrola vlastníctva pred úpravou/mazaním
+1. **CSRF ochrana** – Flask-WTF na formulároch.
+2. **Password hashing** – Werkzeug `generate_password_hash`/`check_password_hash`.
+3. **SQL Injection ochrana** – SQLAlchemy ORM, parameter binding.
+4. **XSS ochrana** – Jinja2 auto-escaping.
+5. **File upload validácia** – Kontrola prípony a bezpečný názov súboru (`secure_filename`).
+6. **Autorizácia** – Kontrola vlastníctva a admin-only dekorátor.
 
 ### Odporúčania pre produkciu
-
-1. Zmeniť `SECRET_KEY` na náhodný reťazec
-2. Použiť HTTPS
-3. Nastaviť `DEBUG = False`
-4. Použiť produkčnú databázu (PostgreSQL)
-5. Implementovať rate limiting
-6. Pridať validáciu MIME type pre upload súborov
+- Zmeniť `SECRET_KEY` na náhodný reťazec (env premenná).
+- Nastaviť `DEBUG = False` mimo vývoja.
+- Použiť HTTPS a reverse proxy.
+- Validovať MIME typy uploadov a limitovať veľkosť súborov.
 
 ---
 
-*Dokumentácia vytvorená: 20.01.2026*
+*Dokumentácia aktualizovaná: 20.01.2026*

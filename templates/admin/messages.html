@@ -1,0 +1,71 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Admin Panel - Správy{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-envelope me-2"></i>Správa správ</h2>
+    <span class="badge bg-warning text-dark fs-6">{{ messages|length }} správ</span>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Od</th>
+                        <th>Pre</th>
+                        <th>Obsah</th>
+                        <th>Inzerát</th>
+                        <th>Stav</th>
+                        <th>Dátum</th>
+                        <th class="text-end">Akcie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for message in messages %}
+                    <tr>
+                        <td>{{ message.id }}</td>
+                        <td>{{ message.sender.username }}</td>
+                        <td>{{ message.receiver.username }}</td>
+                        <td>
+                            <span title="{{ message.content }}">
+                                {{ message.content[:50] }}{% if message.content|length > 50 %}...{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if message.listing %}
+                            <a href="{{ url_for('listing_detail', id=message.listing.id) }}" target="_blank">
+                                {{ message.listing.title[:20] }}...
+                            </a>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if message.is_read %}
+                            <span class="badge bg-success">Prečítaná</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Neprečítaná</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ message.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td class="text-end">
+                            <form method="POST" action="{{ url_for('admin_delete_message', message_id=message.id) }}"
+                                  class="d-inline"
+                                  onsubmit="return confirm('Naozaj chcete zmazať túto správu?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Zmazať">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

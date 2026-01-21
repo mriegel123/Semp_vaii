@@ -1,0 +1,98 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Admin Panel - Kategórie{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-folder me-2"></i>Správa kategórií</h2>
+    <span class="badge bg-info fs-6">{{ categories|length }} kategórií</span>
+</div>
+
+<div class="row">
+    <!-- Pridanie novej kategórie -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Pridať kategóriu</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin_add_category') }}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Názov kategórie</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Popis (voliteľný)</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-plus me-2"></i>Pridať
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zoznam kategórií -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Existujúce kategórie</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Názov</th>
+                                <th>Popis</th>
+                                <th>Inzeráty</th>
+                                <th class="text-end">Akcie</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in categories %}
+                            <tr>
+                                <td>{{ category.id }}</td>
+                                <td><strong>{{ category.name }}</strong></td>
+                                <td>
+                                    {% if category.description %}
+                                    {{ category.description[:50] }}{% if category.description|length > 50 %}...{% endif %}
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ category.listings|length }}</span>
+                                </td>
+                                <td class="text-end">
+                                    {% if category.listings|length == 0 %}
+                                    <form method="POST" action="{{ url_for('admin_delete_category', category_id=category.id) }}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Naozaj chcete zmazať kategóriu \"{{ category.name }}\"?');">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Zmazať">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-muted" title="Kategória obsahuje inzeráty">
+                                        <i class="bi bi-lock"></i>
+                                    </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>Upozornenie:</strong> Kategórie, ktoré obsahujú inzeráty, nemôžu byť zmazané. Najprv je potrebné zmazať alebo presunúť všetky inzeráty.
+</div>
+{% endblock %}

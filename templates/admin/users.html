@@ -1,0 +1,95 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Admin Panel - Používatelia{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-people me-2"></i>Správa používateľov</h2>
+    <span class="badge bg-primary fs-6">{{ users|length }} používateľov</span>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Používateľ</th>
+                        <th>Email</th>
+                        <th>Rola</th>
+                        <th>Registrácia</th>
+                        <th>Inzeráty</th>
+                        <th>Správy</th>
+                        <th class="text-end">Akcie</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.id }}</td>
+                        <td>
+                            <strong>{{ user.username }}</strong>
+                            {% if user.id == current_user.id %}
+                            <span class="badge bg-secondary">Vy</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.email }}</td>
+                        <td>
+                            {% if user.role == 'admin' %}
+                            <span class="badge bg-danger"><i class="bi bi-shield-check"></i> Admin</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Používateľ</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>
+                            <span class="badge bg-info">{{ user.listings|length }}</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-warning text-dark">
+                                {{ user.sent_messages|length + user.received_messages|length }}
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            {% if user.id != current_user.id %}
+                            <div class="btn-group btn-group-sm">
+                                <!-- Toggle Admin Role -->
+                                <form method="POST" action="{{ url_for('admin_toggle_role', user_id=user.id) }}" class="d-inline">
+                                    {% if user.role == 'admin' %}
+                                    <button type="submit" class="btn btn-outline-warning" title="Odobrať admin práva">
+                                        <i class="bi bi-shield-minus"></i>
+                                    </button>
+                                    {% else %}
+                                    <button type="submit" class="btn btn-outline-success" title="Udeliť admin práva">
+                                        <i class="bi bi-shield-plus"></i>
+                                    </button>
+                                    {% endif %}
+                                </form>
+
+                                <!-- Delete User -->
+                                <form method="POST" action="{{ url_for('admin_delete_user', user_id=user.id) }}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Naozaj chcete zmazať používateľa {{ user.username }}?\n\nTáto akcia zmaže:\n- Všetky jeho inzeráty ({{ user.listings|length }})\n- Všetky jeho správy\n- Všetky jeho obľúbené\n\nTáto akcia je nevratná!');">
+                                    <button type="submit" class="btn btn-outline-danger" title="Zmazať používateľa">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <i class="bi bi-info-circle me-2"></i>
+    <strong>Upozornenie:</strong> Pri zmazaní používateľa sa automaticky zmažú všetky jeho inzeráty, správy a obľúbené položky.
+</div>
+{% endblock %}

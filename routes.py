@@ -8,28 +8,33 @@ from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
+
+# ==================== KONŠTANTY ====================
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif'}
+
+
+# ==================== POMOCNÉ FUNKCIE ====================
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def register_routes(app):
-    """Tu sa registrujú všetky routes aplikácie."""
 
-    @app.route('/')
-    def home():
-        # Získanie kategórií pre vyhľadávací formulár
-        categories = Category.query.all()
+def admin_required(f):
+    """Dekorátor pre admin-only routes"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin():
+            flash('Prístup zamietnutý. Vyžadujú sa administrátorské práva.', 'danger')
+            return redirect(url_for('home'))
+        return f(*args, **kwargs)
 
-        # Získanie 6 najnovších aktívnych inzerátov
-        latest_listings = Listing.query.filter_by(status='active') \
-            .order_by(Listing.created_at.desc()) \
-            .limit(6) \
-            .all()
-
+    return decorated_function
 
 
-        return render_template('index.html', categories = categories, latest_listings=latest_listings)
+# ==================== AUTHENTIFIKAČNÉ ROUTES ====================
+def register_auth_routes(app):
+    """Routes pre prihlásenie, registráciu, odhlásenie a správu hesla"""
 
     @app.route('/register', methods=['GET', 'POST'])
     def register():
@@ -122,55 +127,6 @@ def register_routes(app):
     def dashboard():
         return render_template('dashboard.html')
 
-    @app.route('/listings/new', methods=['GET', 'POST'])
-    @login_required
-    def new_listing():
-        form = ListingForm()
-        form.category_id.choices = [(c.id, c.name) for c in Category.query.all()]
-
-        if form.validate_on_submit():
-            listing = Listing(
-                title=form.title.data,
-                description=form.description.data,
-                price=form.price.data,
-                location=form.location.data,
-                user_id=current_user.id,
-                category_id=form.category_id.data
-            )
-
-            db.session.add(listing)
-            db.session.commit()  # Potrebujeme ID pre obrázky
-
-            # Spracovanie nahraných obrázkov
-            if form.images.data:
-                for file in form.images.data:
-                    if file and allowed_file(file.filename):
-                        filename = secure_filename(file.filename)
-                        # Vytvorte jedinečný názov súboru
-                        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
-                        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
-
-                        # Uistite sa, že priečinok existuje
-                        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-                        # Uložte súbor
-                        file.save(file_path)
-
-                        # Vytvorte záznam v databáze
-                        image = Image(
-                            filename=unique_filename,
-                            listing_id=listing.id,
-                            is_primary=False  # Prvý obrázok môžete nastaviť ako primárny
-                        )
-                        db.session.add(image)
-
-                db.session.commit()
-
-            flash('Inzerát bol úspešne pridaný!', 'success')
-            return redirect(url_for('dashboard'))
-
-        return render_template('new_listing.html', form=form)
-
     @app.route('/api/change-password', methods=['POST'])
     @login_required
     def api_change_password():
@@ -197,6 +153,64 @@ def register_routes(app):
             print(f"Chyba pri zmene hesla: {e}")
             return jsonify({'success': False, 'message': 'Chyba servera pri ukladaní nového hesla.'}), 500
 
+
+# ==================== LISTING ROUTES ====================
+def register_listing_routes(app):
+    """Routes pre správu inzerátov"""
+
+    @app.route('/')
+    def home():
+        categories = Category.query.all()
+        latest_listings = Listing.query.filter_by(status='active') \
+            .order_by(Listing.created_at.desc()) \
+            .limit(6) \
+            .all()
+
+        return render_template('index.html', categories=categories, latest_listings=latest_listings)
+
+    @app.route('/listings/new', methods=['GET', 'POST'])
+    @login_required
+    def new_listing():
+        form = ListingForm()
+        form.category_id.choices = [(c.id, c.name) for c in Category.query.all()]
+
+        if form.validate_on_submit():
+            listing = Listing(
+                title=form.title.data,
+                description=form.description.data,
+                price=form.price.data,
+                location=form.location.data,
+                user_id=current_user.id,
+                category_id=form.category_id.data
+            )
+
+            db.session.add(listing)
+            db.session.commit()
+
+            if form.images.data:
+                for file in form.images.data:
+                    if file and allowed_file(file.filename):
+                        filename = secure_filename(file.filename)
+                        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+                        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
+
+                        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+                        file.save(file_path)
+
+                        image = Image(
+                            filename=unique_filename,
+                            listing_id=listing.id,
+                            is_primary=False
+                        )
+                        db.session.add(image)
+
+                db.session.commit()
+
+            flash('Inzerát bol úspešne pridaný!', 'success')
+            return redirect(url_for('dashboard'))
+
+        return render_template('new_listing.html', form=form)
+
     @app.route('/api/my-listings')
     @login_required
     def api_my_listings():
@@ -204,7 +218,6 @@ def register_routes(app):
 
         listings_data = []
         for listing in listings:
-            # Získať URL prvého obrázka, ak existuje
             image_url = None
             if listing.images and len(listing.images) > 0:
                 image_url = url_for('static', filename='uploads/' + listing.images[0].filename)
@@ -218,8 +231,8 @@ def register_routes(app):
                 'status': listing.status,
                 'created_at': listing.created_at.strftime('%d.%m.%Y') if listing.created_at else 'N/A',
                 'category_name': listing.category.name if listing.category else 'Bez kategórie',
-                'image_url': image_url,  # Pridané URL obrázka
-                'has_images': len(listing.images) > 0  # Pridané informácie o existencii obrázkov
+                'image_url': image_url,
+                'has_images': len(listing.images) > 0
             })
 
         return jsonify(listings_data)
@@ -228,7 +241,6 @@ def register_routes(app):
     def listing_detail(id):
         listing = Listing.query.get_or_404(id)
 
-        # Získanie podobných inzerátov (z rovnakej kategórie)
         similar_listings = Listing.query \
             .filter(Listing.category_id == listing.category_id,
                     Listing.id != listing.id,
@@ -237,7 +249,6 @@ def register_routes(app):
             .limit(4) \
             .all()
 
-        # Získanie ID obľúbených inzerátov aktuálneho používateľa
         current_user_favorites = []
         if current_user.is_authenticated:
             current_user_favorites = [f.listing_id for f in current_user.favorites]
@@ -259,7 +270,6 @@ def register_routes(app):
         form = ListingForm()
         form.category_id.choices = [(c.id, c.name) for c in Category.query.all()]
 
-        # Naplnenie formulára s existujúcimi dátami (okrem obrázkov)
         if request.method == 'GET':
             form.title.data = listing.title
             form.description.data = listing.description
@@ -274,10 +284,8 @@ def register_routes(app):
             listing.location = form.location.data
             listing.category_id = form.category_id.data
 
-            # Spracovanie nových nahraných obrázkov
             if form.images.data:
                 for file in form.images.data:
-                    # Skontrolovať, či ide o skutočný súbor
                     if hasattr(file, 'filename') and file.filename and allowed_file(file.filename):
                         filename = secure_filename(file.filename)
                         unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
@@ -292,28 +300,23 @@ def register_routes(app):
                             is_primary=False
                         )
                         db.session.add(image)
-                    # Debug: vypísať informácie o súbore
-                    else:
-                        print(f"Súbor nie je validný: {file}")
 
             db.session.commit()
             flash('Inzerát bol úspešne upravený!', 'success')
             return redirect(url_for('dashboard'))
 
         return render_template('edit_listing.html', form=form, listing=listing)
+
     @app.route('/listings')
     def listings():
-        # Získanie parametrov z requestu
         search_query = request.args.get('q', '').strip()
         category_id = request.args.get('category', type=int)
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
         location_query = request.args.get('location', '').strip()
 
-        # Začneme s dotazom pre aktívne inzeráty
         query = Listing.query.filter_by(status='active')
 
-        # Vyhľadávanie (full-text) - hľadá v titulku a popise
         if search_query:
             like_pattern = f'%{search_query}%'
             query = query.filter(
@@ -323,29 +326,23 @@ def register_routes(app):
                 )
             )
 
-        # Filtrovanie podľa kategórie
         if category_id:
             query = query.filter_by(category_id=category_id)
 
-        # Filtrovanie podľa ceny
         if min_price is not None:
             query = query.filter(Listing.price >= min_price)
         if max_price is not None:
             query = query.filter(Listing.price <= max_price)
 
-        # Filtrovanie podľa lokality
         if location_query:
             query = query.filter(Listing.location.ilike(f'%{location_query}%'))
 
-        # Zoradenie podľa dátumu vytvorenia (od najnovšieho)
         query = query.order_by(Listing.created_at.desc())
 
-        # Pagination
         page = request.args.get('page', 1, type=int)
         per_page = 12
         paginated_listings = query.paginate(page=page, per_page=per_page, error_out=False)
 
-        # Získať kategórie pre sidebar
         categories = Category.query.all()
 
         return render_template('listings.html',
@@ -355,19 +352,58 @@ def register_routes(app):
                                selected_category=category_id,
                                total_listings=query.count())
 
+    @app.route('/listings/<int:id>/delete', methods=['POST'])
+    @login_required
+    def delete_listing(id):
+        listing = Listing.query.get_or_404(id)
+
+        if listing.user_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
+
+        db.session.delete(listing)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Inzerát bol odstránený'}), 200
+
+    @app.route('/listings/<int:listing_id>/images/<int:image_id>/delete', methods=['DELETE'])
+    @login_required
+    def delete_image(listing_id, image_id):
+        listing = Listing.query.get_or_404(listing_id)
+        image = Image.query.get_or_404(image_id)
+
+        if listing.user_id != current_user.id:
+            return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
+
+        if image.listing_id != listing_id:
+            return jsonify({'success': False, 'message': 'Obrázok nepatrí k tomuto inzerátu'}), 400
+
+        try:
+            file_path = os.path.join(UPLOAD_FOLDER, image.filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+            db.session.delete(image)
+            db.session.commit()
+
+            return jsonify({'success': True, 'message': 'Obrázok bol odstránený'}), 200
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri mazaní obrázka: {e}")
+            return jsonify({'success': False, 'message': 'Chyba pri odstraňovaní obrázka'}), 500
+
+
+# ==================== FAVORITE ROUTES ====================
+def register_favorite_routes(app):
+    """Routes pre správu obľúbených inzerátov"""
 
     @app.route('/api/my-favorites')
     @login_required
     def api_my_favorites():
-        # Získať ID obľúbených inzerátov používateľa
         favorite_ids = [f.listing_id for f in current_user.favorites]
-
-        # Získať samotné inzeráty
         listings = Listing.query.filter(Listing.id.in_(favorite_ids)).all()
 
         listings_data = []
         for listing in listings:
-            # Získať URL prvého obrázka, ak existuje
             image_url = None
             if listing.images and len(listing.images) > 0:
                 image_url = url_for('static', filename='uploads/' + listing.images[0].filename)
@@ -384,42 +420,108 @@ def register_routes(app):
                 'image_url': image_url,
                 'has_images': len(listing.images) > 0,
                 'author': listing.author.username,
-                'is_favorite': True  # Vždy true, lebo sú to obľúbené
+                'is_favorite': True
             })
 
         return jsonify(listings_data)
-    # mazanie inzeratu
-    @app.route('/listings/<int:listing_id>/images/<int:image_id>/delete', methods=['DELETE'])
+
+    @app.route('/api/favorite/<int:listing_id>', methods=['POST'])
     @login_required
-    def delete_image(listing_id, image_id):
-        listing = Listing.query.get_or_404(listing_id)
-        image = Image.query.get_or_404(image_id)
+    def api_favorite(listing_id):
+        favorite = Favorite.query.filter_by(
+            user_id=current_user.id,
+            listing_id=listing_id
+        ).first()
 
-        # Kontrola, či používateľ vlastní inzerát
-        if listing.user_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
-
-        # Kontrola, či obrázok patrí k inzerátu
-        if image.listing_id != listing_id:
-            return jsonify({'success': False, 'message': 'Obrázok nepatrí k tomuto inzerátu'}), 400
+        if favorite:
+            db.session.delete(favorite)
+            action = 'odstránený'
+            favorited = False
+        else:
+            favorite = Favorite(
+                user_id=current_user.id,
+                listing_id=listing_id
+            )
+            db.session.add(favorite)
+            action = 'pridaný'
+            favorited = True
 
         try:
-            # Odstrániť súbor z disku
-            file_path = os.path.join(UPLOAD_FOLDER, image.filename)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-            # Odstrániť záznam z databázy
-            db.session.delete(image)
             db.session.commit()
-
-            return jsonify({'success': True, 'message': 'Obrázok bol odstránený'}), 200
+            return jsonify({
+                'success': True,
+                'message': f'Inzerát bol {action} do obľúbených.',
+                'favorited': favorited
+            }), 200
         except Exception as e:
             db.session.rollback()
-            print(f"Chyba pri mazaní obrázka: {e}")
-            return jsonify({'success': False, 'message': 'Chyba pri odstraňovaní obrázka'}), 500
+            print(f"Chyba pri ukladaní: {e}")
+            return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
 
-    # Route pre odoslanie správy
+    @app.route('/toggle-favorite', methods=['POST'])
+    @login_required
+    def toggle_favorite():
+        listing_id = request.form.get('listing_id')
+        is_ajax = request.headers.get(
+            'X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'multipart/form-data'
+
+        if not listing_id:
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Chýbajúce údaje.'}), 400
+            flash('Chýbajúce údaje.', 'danger')
+            return redirect(request.referrer or url_for('home'))
+
+        favorite = Favorite.query.filter_by(
+            user_id=current_user.id,
+            listing_id=listing_id
+        ).first()
+
+        if favorite:
+            db.session.delete(favorite)
+            action = 'odstránený z'
+            favorited = False
+        else:
+            favorite = Favorite(
+                user_id=current_user.id,
+                listing_id=listing_id
+            )
+            db.session.add(favorite)
+            action = 'pridaný do'
+            favorited = True
+
+        try:
+            db.session.commit()
+            if is_ajax:
+                return jsonify({
+                    'success': True,
+                    'message': f'Inzerát bol {action} obľúbených.',
+                    'favorited': favorited
+                }), 200
+            flash(f'Inzerát bol {action} obľúbených.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri ukladaní: {e}")
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
+            flash('Chyba pri ukladaní.', 'danger')
+
+        return redirect(request.referrer or url_for('listing_detail', id=listing_id))
+
+    @app.route('/api/check-favorite/<int:listing_id>')
+    @login_required
+    def check_favorite(listing_id):
+        favorite = Favorite.query.filter_by(
+            user_id=current_user.id,
+            listing_id=listing_id
+        ).first()
+
+        return jsonify({'is_favorite': favorite is not None})
+
+
+# ==================== MESSAGE ROUTES ====================
+def register_message_routes(app):
+    """Routes pre správu správ a konverzácií"""
+
     @app.route('/send-message', methods=['POST'])
     @login_required
     def send_message():
@@ -448,121 +550,9 @@ def register_routes(app):
 
         return redirect(request.referrer or url_for('home'))
 
-    @app.route('/api/favorite/<int:listing_id>', methods=['POST'])
-    @login_required
-    def api_favorite(listing_id):
-        # Skontrolovať, či už je inzerát v obľúbených
-        favorite = Favorite.query.filter_by(
-            user_id=current_user.id,
-            listing_id=listing_id
-        ).first()
-
-        if favorite:
-            # Odstrániť z obľúbených
-            db.session.delete(favorite)
-            action = 'odstránený'
-            favorited = False
-        else:
-            # Pridať do obľúbených
-            favorite = Favorite(
-                user_id=current_user.id,
-                listing_id=listing_id
-            )
-            db.session.add(favorite)
-            action = 'pridaný'
-            favorited = True
-
-        try:
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': f'Inzerát bol {action} do obľúbených.',
-                'favorited': favorited
-            }), 200
-        except Exception as e:
-            db.session.rollback()
-            print(f"Chyba pri ukladaní: {e}")
-            return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
-    # Route pre obľúbené (podporuje AJAX aj formulárový POST)
-    @app.route('/toggle-favorite', methods=['POST'])
-    @login_required
-    def toggle_favorite():
-        listing_id = request.form.get('listing_id')
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.content_type == 'multipart/form-data'
-
-        if not listing_id:
-            if is_ajax:
-                return jsonify({'success': False, 'message': 'Chýbajúce údaje.'}), 400
-            flash('Chýbajúce údaje.', 'danger')
-            return redirect(request.referrer or url_for('home'))
-
-        # Skontrolovať, či už je inzerát v obľúbených
-        favorite = Favorite.query.filter_by(
-            user_id=current_user.id,
-            listing_id=listing_id
-        ).first()
-
-        if favorite:
-            # Odstrániť z obľúbených
-            db.session.delete(favorite)
-            action = 'odstránený z'
-            favorited = False
-        else:
-            # Pridať do obľúbených
-            favorite = Favorite(
-                user_id=current_user.id,
-                listing_id=listing_id
-            )
-            db.session.add(favorite)
-            action = 'pridaný do'
-            favorited = True
-
-        try:
-            db.session.commit()
-            if is_ajax:
-                return jsonify({
-                    'success': True,
-                    'message': f'Inzerát bol {action} obľúbených.',
-                    'favorited': favorited
-                }), 200
-            flash(f'Inzerát bol {action} obľúbených.', 'success')
-        except Exception as e:
-            db.session.rollback()
-            print(f"Chyba pri ukladaní: {e}")
-            if is_ajax:
-                return jsonify({'success': False, 'message': 'Chyba pri ukladaní.'}), 500
-            flash('Chyba pri ukladaní.', 'danger')
-
-        return redirect(request.referrer or url_for('listing_detail', id=listing_id))
-
-    # API endpoint pre kontrolu obľúbených
-    @app.route('/api/check-favorite/<int:listing_id>')
-    @login_required
-    def check_favorite(listing_id):
-        favorite = Favorite.query.filter_by(
-            user_id=current_user.id,
-            listing_id=listing_id
-        ).first()
-
-        return jsonify({'is_favorite': favorite is not None})
-    @app.route('/listings/<int:id>/delete', methods=['POST'])
-    @login_required
-    def delete_listing(id):
-        listing = Listing.query.get_or_404(id)
-
-        if listing.user_id != current_user.id:
-            return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
-
-        db.session.delete(listing)
-        db.session.commit()
-
-        return jsonify({'success': True, 'message': 'Inzerát bol odstránený'}), 200
-
-    # API endpoint na získanie správ používateľa
     @app.route('/api/my-messages')
     @login_required
     def api_my_messages():
-        # Získať správy kde používateľ je odosielateľ alebo príjemca
         messages = Message.query.filter(
             (Message.sender_id == current_user.id) |
             (Message.receiver_id == current_user.id)
@@ -586,13 +576,11 @@ def register_routes(app):
 
         return jsonify(messages_data)
 
-    # API endpoint na označenie správy ako prečítanej
     @app.route('/api/messages/<int:message_id>/read', methods=['POST'])
     @login_required
     def mark_message_as_read(message_id):
         message = Message.query.get_or_404(message_id)
 
-        # Kontrola, či používateľ je príjemca správy
         if message.receiver_id != current_user.id:
             return jsonify({'success': False, 'message': 'Nemáte oprávnenie'}), 403
 
@@ -605,12 +593,10 @@ def register_routes(app):
             print(f"Chyba pri označovaní správy: {e}")
             return jsonify({'success': False, 'message': 'Chyba pri označovaní správy'}), 500
 
-    # API endpoint na získanie správ konkrétnej konverzácie
     @app.route('/api/conversation/<int:other_user_id>')
     @app.route('/api/conversation/<int:other_user_id>/<int:listing_id>')
     @login_required
     def api_conversation(other_user_id, listing_id=None):
-        # Získanie všetkých správ medzi používateľmi
         query = Message.query.filter(
             or_(
                 and_(Message.sender_id == current_user.id, Message.receiver_id == other_user_id),
@@ -625,7 +611,6 @@ def register_routes(app):
 
         messages = query.order_by(Message.created_at.asc()).all()
 
-        # Označiť správy ako prečítané
         for msg in messages:
             if msg.receiver_id == current_user.id and not msg.is_read:
                 msg.is_read = True
@@ -635,7 +620,6 @@ def register_routes(app):
         except:
             db.session.rollback()
 
-        # Získanie informácií o druhom používateľovi
         other_user = User.query.get(other_user_id)
         listing = Listing.query.get(listing_id) if listing_id else None
 
@@ -664,7 +648,6 @@ def register_routes(app):
             } if listing else None
         })
 
-    # API endpoint na odoslanie správy cez AJAX
     @app.route('/api/send-message', methods=['POST'])
     @login_required
     def api_send_message():
@@ -698,11 +681,9 @@ def register_routes(app):
             print(f"Chyba pri odosielaní správy: {e}")
             return jsonify({'success': False, 'message': 'Chyba pri odosielaní správy'}), 500
 
-    # API endpoint na získanie konverzácií používateľa
     @app.route('/api/conversations')
     @login_required
     def api_conversations():
-        # Získanie všetkých správ kde je používateľ odosielateľ alebo príjemca
         all_messages = Message.query.filter(
             or_(
                 Message.sender_id == current_user.id,
@@ -710,28 +691,22 @@ def register_routes(app):
             )
         ).order_by(desc(Message.created_at)).all()
 
-        # Zoskupenie správ podľa konverzácie (druhý používateľ + listing)
-        # Kľúč: (other_user_id, listing_id)
         conversations_dict = {}
 
         for msg in all_messages:
-            # Určiť druhého používateľa v konverzácii
             other_user_id = msg.receiver_id if msg.sender_id == current_user.id else msg.sender_id
             listing_id = msg.listing_id
 
             key = (other_user_id, listing_id)
 
-            # Ak ešte nemáme túto konverzáciu, pridáme ju (správy sú zoradené od najnovšej)
             if key not in conversations_dict:
                 conversations_dict[key] = msg
 
-        # Vytvoriť zoznam konverzácií
         conversations = []
         for (other_user_id, listing_id), msg in conversations_dict.items():
             other_user = msg.receiver if msg.sender_id == current_user.id else msg.sender
             listing = msg.listing
 
-            # Počet neprečítaných správ od druhého používateľa
             unread_query = Message.query.filter(
                 Message.sender_id == other_user_id,
                 Message.receiver_id == current_user.id,
@@ -755,7 +730,6 @@ def register_routes(app):
                 'unread_count': unread_count
             })
 
-        # Zoradiť podľa času poslednej správy (najnovšie prvé)
         conversations.sort(key=lambda x: x['last_message_time'], reverse=True)
 
         return jsonify(conversations)
@@ -769,3 +743,188 @@ def register_routes(app):
         ).count()
 
         return jsonify({'count': count})
+
+
+# ==================== ADMIN ROUTES ====================
+def register_admin_routes(app):
+    """Routes pre admin panel"""
+
+    @app.route('/admin')
+    @login_required
+    @admin_required
+    def admin_panel():
+        users_count = User.query.count()
+        listings_count = Listing.query.count()
+        messages_count = Message.query.count()
+        categories_count = Category.query.count()
+
+        return render_template('admin/dashboard.html',
+                               users_count=users_count,
+                               listings_count=listings_count,
+                               messages_count=messages_count,
+                               categories_count=categories_count)
+
+    @app.route('/admin/users')
+    @login_required
+    @admin_required
+    def admin_users():
+        users = User.query.order_by(User.created_at.desc()).all()
+        return render_template('admin/users.html', users=users)
+
+    @app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+    @login_required
+    @admin_required
+    def admin_delete_user(user_id):
+        user = User.query.get_or_404(user_id)
+
+        if user.id == current_user.id:
+            flash('Nemôžete zmazať svoj vlastný účet.', 'danger')
+            return redirect(url_for('admin_users'))
+
+        username = user.username
+
+        try:
+            db.session.delete(user)
+            db.session.commit()
+            flash(f'Používateľ "{username}" a všetky jeho dáta boli zmazané.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri mazaní používateľa: {e}")
+            flash('Chyba pri mazaní používateľa.', 'danger')
+
+        return redirect(url_for('admin_users'))
+
+    @app.route('/admin/users/<int:user_id>/toggle-role', methods=['POST'])
+    @login_required
+    @admin_required
+    def admin_toggle_role(user_id):
+        user = User.query.get_or_404(user_id)
+
+        if user.id == current_user.id:
+            flash('Nemôžete zmeniť svoju vlastnú rolu.', 'danger')
+            return redirect(url_for('admin_users'))
+
+        if user.role == 'admin':
+            user.role = 'user'
+            flash(f'Používateľ "{user.username}" už nie je administrátor.', 'info')
+        else:
+            user.role = 'admin'
+            flash(f'Používateľ "{user.username}" je teraz administrátor.', 'success')
+
+        db.session.commit()
+        return redirect(url_for('admin_users'))
+
+    @app.route('/admin/listings')
+    @login_required
+    @admin_required
+    def admin_listings():
+        listings = Listing.query.order_by(Listing.created_at.desc()).all()
+        return render_template('admin/listings.html', listings=listings)
+
+    @app.route('/admin/listings/<int:listing_id>/delete', methods=['POST'])
+    @login_required
+    @admin_required
+    def admin_delete_listing(listing_id):
+        listing = Listing.query.get_or_404(listing_id)
+        title = listing.title
+
+        try:
+            db.session.delete(listing)
+            db.session.commit()
+            flash(f'Inzerát "{title}" bol zmazaný.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri mazaní inzerátu: {e}")
+            flash('Chyba pri mazaní inzerátu.', 'danger')
+
+        return redirect(url_for('admin_listings'))
+
+    @app.route('/admin/messages')
+    @login_required
+    @admin_required
+    def admin_messages():
+        messages = Message.query.order_by(Message.created_at.desc()).all()
+        return render_template('admin/messages.html', messages=messages)
+
+    @app.route('/admin/messages/<int:message_id>/delete', methods=['POST'])
+    @login_required
+    @admin_required
+    def admin_delete_message(message_id):
+        message = Message.query.get_or_404(message_id)
+
+        try:
+            db.session.delete(message)
+            db.session.commit()
+            flash('Správa bola zmazaná.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri mazaní správy: {e}")
+            flash('Chyba pri mazaní správy.', 'danger')
+
+        return redirect(url_for('admin_messages'))
+
+    @app.route('/admin/categories')
+    @login_required
+    @admin_required
+    def admin_categories():
+        categories = Category.query.all()
+        return render_template('admin/categories.html', categories=categories)
+
+    @app.route('/admin/categories/add', methods=['POST'])
+    @login_required
+    @admin_required
+    def admin_add_category():
+        name = request.form.get('name')
+        description = request.form.get('description', '')
+
+        if not name:
+            flash('Názov kategórie je povinný.', 'danger')
+            return redirect(url_for('admin_categories'))
+
+        category = Category(name=name, description=description)
+
+        try:
+            db.session.add(category)
+            db.session.commit()
+            flash(f'Kategória "{name}" bola pridaná.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri pridávaní kategórie: {e}")
+            flash('Chyba pri pridávaní kategórie.', 'danger')
+
+        return redirect(url_for('admin_categories'))
+
+    @app.route('/admin/categories/<int:category_id>/delete', methods=['POST'])
+    @login_required
+    @admin_required
+    def admin_delete_category(category_id):
+        category = Category.query.get_or_404(category_id)
+
+        if category.listings:
+            flash(f'Kategória "{category.name}" obsahuje inzeráty a nemôže byť zmazaná.', 'danger')
+            return redirect(url_for('admin_categories'))
+
+        name = category.name
+
+        try:
+            db.session.delete(category)
+            db.session.commit()
+            flash(f'Kategória "{name}" bola zmazaná.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            print(f"Chyba pri mazaní kategórie: {e}")
+            flash('Chyba pri mazaní kategórie.', 'danger')
+
+        return redirect(url_for('admin_categories'))
+
+
+# ==================== HLAVNÁ FUNKCIA PRE REGISTRÁCIU ROUTES ====================
+def register_routes(app):
+    """Tu sa registrujú všetky routes aplikácie."""
+
+    # Registrácia všetkých skupín routes
+    register_auth_routes(app)
+    register_listing_routes(app)
+    register_favorite_routes(app)
+    register_message_routes(app)
+    register_admin_routes(app)

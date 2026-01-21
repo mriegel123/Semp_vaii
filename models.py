@@ -62,13 +62,16 @@ class User(db.Model, UserMixin):
     role = db.Column(db.String(20), default='user')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    listings = db.relationship('Listing', backref='author', lazy=True)
-    sent_messages = db.relationship('Message', foreign_keys=[Message.sender_id], backref='sender', lazy=True)
-    received_messages = db.relationship('Message', foreign_keys=[Message.receiver_id], backref='receiver', lazy=True)
-    favorites = db.relationship('Favorite', backref='user', lazy=True)
+    listings = db.relationship('Listing', backref='author', lazy=True, cascade='all, delete-orphan')
+    sent_messages = db.relationship('Message', foreign_keys=[Message.sender_id], backref='sender', lazy=True, cascade='all, delete-orphan')
+    received_messages = db.relationship('Message', foreign_keys=[Message.receiver_id], backref='receiver', lazy=True, cascade='all, delete-orphan')
+    favorites = db.relationship('Favorite', backref='user', lazy=True, cascade='all, delete-orphan')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def is_admin(self):
+        return self.role == 'admin'
